@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/invite_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/services/invite_service.dart';
 
 class EnterInvitePage extends StatefulWidget {
   const EnterInvitePage({super.key});
@@ -104,13 +104,13 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.psychologist.withOpacity(0.08),
-                      AppColors.gradientEnd.withOpacity(0.05),
+                      AppColors.psychologist.withValues(alpha: 0.08),
+                      AppColors.gradientEnd.withValues(alpha: 0.05),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: AppColors.psychologist.withOpacity(0.2),
+                    color: AppColors.psychologist.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -180,7 +180,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -240,7 +240,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.patient.withOpacity(0.35),
+                            color: AppColors.patient.withValues(alpha: 0.35),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),

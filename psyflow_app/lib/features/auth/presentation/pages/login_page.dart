@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/auth_error_translator.dart';
 import 'register_page.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -30,11 +32,11 @@ class _LoginPageState extends State<LoginPage> {
       // AuthGate in main.dart handles navigation after login
     } on AuthException catch (e) {
       if (mounted) {
-        _showError(e.message);
+        _showError(AuthErrorTranslator.translate(e));
       }
     } catch (e) {
       if (mounted) {
-        _showError('Ocorreu um erro. Tente novamente.');
+        _showError(AuthErrorTranslator.translate(e));
       }
     }
 
@@ -89,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(
@@ -112,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
                     Text(
                       'Cuidado que transforma',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -199,7 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.35),
+                              color: AppColors.primary.withValues(alpha: 0.35),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -235,6 +237,21 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ForgotPasswordPage(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        'Esqueci minha senha',
+                      ),
+                    ),
+
                     const SizedBox(height: 20),
 
                     // Link criar conta

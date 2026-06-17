@@ -13,6 +13,10 @@ class AppColors {
   static const accentLight = Color(0xFFB3A8E0);
   static const error = Color(0xFFE57373);
   static const success = Color(0xFF4CAF50);
+  // Cores nomeadas (antes hardcoded nos widgets)
+  static const cardRed = Color(0xFFE57373);
+  static const cardGreen = Color(0xFF4CAF82);
+  static const cardOrange = Color(0xFFFFB74D);
 }
 
 class AppTheme {

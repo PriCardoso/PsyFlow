@@ -1,325 +1,372 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/auth_service.dart';
-import '../../auth/presentation/pages/login_page.dart';
-import '../../psychologist/invite_page.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/services/appointment_service.dart';
+import '../../../core/services/invite_service.dart';
+import '../../../models/appointment_model.dart';
+import '../../../shared/widgets/app_drawer.dart';
+import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
+import '../../psychologist/patients_page.dart';
+import '../../tasks/psychologist_tasks_page.dart';
+import '../../appointments/manage_availability_page.dart';
 
 class PsychologistDashboardPage extends StatefulWidget {
-  const PsychologistDashboardPage({super.key});
+  final String? initialName;
+
+  const PsychologistDashboardPage({super.key, this.initialName});
 
   @override
   State<PsychologistDashboardPage> createState() => _PsychologistDashboardPageState();
 }
 
 class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
-  final supabase = Supabase.instance.client;
+  final _appointmentService = AppointmentService();
+  final _inviteService = InviteService();
+
   String? userName;
+  String? userEmail;
+  List<AppointmentItem> _appointments = [];
+  int _activePatients = 0;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    userName = widget.initialName;
+    userEmail = Supabase.instance.client.auth.currentUser?.email;
+    _load();
   }
 
-  Future<void> _loadUser() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    final data = await supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (mounted && data != null) {
-      setState(() => userName = data['full_name']);
-    }
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final appts = await _appointmentService.getMyAppointmentsAsPsychologist();
+      final patients = await _inviteService.getMyPatients();
+      if (mounted) {
+        setState(() {
+          _appointments = appts;
+          _activePatients = patients.where((p) => p.active).length;
+        });
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _logout() async {
-    await AuthService().logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (_) => false,
-      );
-    }
+  String _formatDate(DateTime d) {
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${(d.year % 100).toString().padLeft(2, '0')}';
+  }
+
+  String _formatTime(DateTime d) {
+    return '${d.hour.toString().padLeft(2, '0')}h${d.minute > 0 ? d.minute.toString().padLeft(2, '0') : ''}';
   }
 
   @override
   Widget build(BuildContext context) {
     final firstName = userName?.split(' ').first ?? 'Psicólogo';
+    final upcoming = _appointments.where((a) => a.isUpcoming).toList();
+    final next = upcoming.isNotEmpty ? upcoming.first : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // ── App bar com gradiente ────────────────────────────
-          SliverAppBar(
-            expandedHeight: 180,
-            floating: false,
-            pinned: true,
-            backgroundColor: AppColors.psychologist,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.person_outline_rounded, color: Colors.white),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EditProfilePage()),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                onPressed: _logout,
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.psychologist, AppColors.gradientEnd],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 26),
-                            ),
-                            const SizedBox(width: 14),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Olá, Dr. $firstName 👋',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  'Psicólogo',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+      drawer: AppDrawer(
+        userName: userName ?? 'Psicólogo',
+        userEmail: userEmail ?? '',
+        roleLabel: 'Psicólogo(a)',
+        accentColor: AppColors.psychologist,
+        selectedIndex: 0,
+        items: [
+          DrawerMenuItem(
+            label: 'Início',
+            icon: Icons.home_rounded,
+            onTap: () {},
           ),
-
-          SliverPadding(
-            padding: const EdgeInsets.all(20),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Cards principais ─────────────────────────
-                const Text(
-                  'Meu espaço',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+          DrawerMenuItem(
+            label: 'Minha Agenda',
+            icon: Icons.calendar_today_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAvailabilityPage())),
+          ),
+          DrawerMenuItem(
+            label: 'Pacientes',
+            icon: Icons.people_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientsPage())),
+          ),
+          DrawerMenuItem(
+            label: 'Tarefas',
+            icon: Icons.task_alt_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PsychologistTasksPage())),
+          ),
+          DrawerMenuItem(
+            label: 'Configurações',
+            icon: Icons.settings_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppColors.psychologist,
+          onRefresh: _load,
+          child: CustomScrollView(
+            slivers: [
+              // ── Header simples ──────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Row(
+                    children: [
+                      Builder(
+                        builder: (context) => IconButton(
+                          icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+                          onPressed: () => Scaffold.of(context).openDrawer(),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'PsyFlow',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.psychologist),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [AppColors.psychologist, AppColors.gradientEnd]),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 1.1,
-                  children: [
-                    _DashCard(
-                      title: 'Pacientes',
-                      subtitle: 'Gerenciar vínculos',
-                      icon: Icons.people_rounded,
-                      color: AppColors.psychologist,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const InvitePage()),
+              ),
+
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // ── Saudação + botão agenda ──────────────────
+                    Text(
+                      'Bem-vindo(a), Dr. $firstName',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.psychologist,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                        ).then((_) => _load()),
+                        icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+                        label: const Text('Gerenciar agenda', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ),
-                    _DashCard(
-                      title: 'Tarefas',
-                      subtitle: 'Atribuir atividades',
-                      icon: Icons.task_alt_rounded,
-                      color: Color(0xFF4CAF82),
+                    const SizedBox(height: 20),
+
+                    // ── Próxima sessão ───────────────────────────
+                    PanelCard(
+                      title: 'Próxima sessão',
+                      footerLabel: 'Ver toda a agenda',
+                      onFooterTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                      ).then((_) => _load()),
+                      child: _loading
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(child: CircularProgressIndicator(color: AppColors.psychologist, strokeWidth: 2)),
+                            )
+                          : next == null
+                              ? const PanelEmptyState(
+                                  icon: Icons.event_busy_rounded,
+                                  title: 'Nenhuma sessão agendada',
+                                  subtitle: 'Configure sua agenda para começar',
+                                )
+                              : Row(
+                                  children: [
+                                    Container(
+                                      width: 64,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            _formatDate(next.startTime),
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _formatTime(next.startTime),
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(alpha: 0.25),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'agendada',
+                                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(colors: [AppColors.patient, AppColors.accentLight]),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.person_rounded, color: Colors.white, size: 16),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Expanded(
+                                                child: Text(
+                                                  'Consulta com',
+                                                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            next.otherPartyName ?? 'Paciente',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
+                                          ),
+                                          const Text(
+                                            'Paciente',
+                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                     ),
-                    _DashCard(
-                      title: 'Mapa Emocional',
-                      subtitle: 'Acompanhar humor',
-                      icon: Icons.favorite_rounded,
-                      color: Color(0xFFE57373),
+                    const SizedBox(height: 16),
+
+                    // ── Grid de 2 cards: Pacientes / Tarefas ──────
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          children: [
+                            SizedBox(
+                              width: (constraints.maxWidth - 16) / 2,
+                              child: PanelCard(
+                                title: 'Meus Pacientes',
+                                footerLabel: 'Gerenciar vínculos',
+                                onFooterTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const PatientsPage()),
+                                ).then((_) => _load()),
+                                child: _loading
+                                    ? const SizedBox(height: 50, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
+                                    : Row(
+                                        children: [
+                                          Text(
+                                            '$_activePatients',
+                                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.psychologist),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Text(
+                                              'vínculo(s)\nativo(s)',
+                                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.2),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: (constraints.maxWidth - 16) / 2,
+                              child: PanelCard(
+                                title: 'Tarefas',
+                                footerLabel: 'Atribuir atividade',
+                                onFooterTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const PsychologistTasksPage()),
+                                ),
+                                child: const PanelEmptyState(
+                                  icon: Icons.task_alt_rounded,
+                                  title: 'Acompanhe atividades',
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                    _DashCard(
-                      title: 'Plano Terapêutico',
-                      subtitle: 'Criar e editar planos',
-                      icon: Icons.route_rounded,
-                      color: AppColors.gradientEnd,
+                    const SizedBox(height: 16),
+
+                    // ── Próximas sessões da semana ────────────────
+                    PanelCard(
+                      title: 'Próximas sessões',
+                      footerLabel: upcoming.length > 1 ? 'Ver todas (${upcoming.length})' : null,
+                      onFooterTap: upcoming.length > 1
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                              ).then((_) => _load())
+                          : null,
+                      child: _loading
+                          ? const SizedBox(height: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
+                          : upcoming.length <= 1
+                              ? const PanelEmptyState(
+                                  icon: Icons.calendar_month_outlined,
+                                  title: 'Sem outras sessões na fila',
+                                )
+                              : Column(
+                                  children: upcoming.skip(1).take(3).map((a) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 10),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.event_rounded, color: AppColors.psychologist, size: 18),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                '${a.otherPartyName ?? 'Paciente'} • ${_formatDate(a.startTime)} ${_formatTime(a.startTime)}',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )).toList(),
+                                ),
                     ),
-                  ],
+                  ]),
                 ),
-                const SizedBox(height: 24),
-
-                // ── Próximas sessões (placeholder) ───────────
-                const Text(
-                  'Próximas sessões',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _SessionCard(
-                  name: 'Nenhuma sessão agendada',
-                  time: 'Configure sua agenda para começar',
-                  icon: Icons.calendar_today_rounded,
-                  color: AppColors.psychologist.withOpacity(0.1),
-                  iconColor: AppColors.psychologist,
-                ),
-              ]),
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _DashCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-}
-
-class _SessionCard extends StatelessWidget {
-  final String name;
-  final String time;
-  final IconData icon;
-  final Color color;
-  final Color iconColor;
-
-  const _SessionCard({
-    required this.name,
-    required this.time,
-    required this.icon,
-    required this.color,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary)),
-                const SizedBox(height: 2),
-                Text(time, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

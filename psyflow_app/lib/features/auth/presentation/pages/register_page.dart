@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/auth_error_translator.dart';
 import 'complete_profile_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -45,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
     } catch (e) {
-      if (mounted) _showError('Erro ao criar conta: ${e.toString()}');
+      if (mounted) _showError(AuthErrorTranslator.translate(e));
     }
 
     if (mounted) setState(() => loading = false);
@@ -103,7 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
@@ -122,7 +123,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     Text(
                       'Passo 1 de 2 — Informações de acesso',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                     ),
@@ -246,7 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.35),
+                              color: AppColors.primary.withValues(alpha: 0.35),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -323,7 +324,7 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.1) : AppColors.surface,
+          color: selected ? color.withValues(alpha: 0.1) : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? color : const Color(0xFFE0E7EF),
@@ -332,7 +333,7 @@ class _RoleCard extends StatelessWidget {
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   )

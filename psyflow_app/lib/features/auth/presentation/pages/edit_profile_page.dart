@@ -176,7 +176,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
@@ -189,7 +189,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
@@ -204,9 +204,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             width: 84,
                             height: 84,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
+                              color: Colors.white.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
                             ),
                             child: Center(
                               child: Text(
@@ -233,7 +233,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           Text(
                             email ?? '',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 13,
                             ),
                           ),
@@ -241,7 +241,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -347,7 +347,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: roleColor.withOpacity(0.35),
+                                    color: roleColor.withValues(alpha: 0.35),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),

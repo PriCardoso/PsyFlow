@@ -7,10 +7,11 @@ class UserService {
     required String role,
     required String fullName,
     String? phone,
-    String? crp, // for psychologists
+    String? crp,
     String? bio,
   }) async {
-    final user = supabase.auth.currentUser!;
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('Usuário não autenticado.');
 
     await supabase.from('users').upsert({
       'id': user.id,
@@ -28,12 +29,15 @@ class UserService {
     final user = supabase.auth.currentUser;
     if (user == null) return null;
 
-    final data = await supabase
-        .from('users')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    return data;
+    try {
+      final data = await supabase
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      return data;
+    } catch (e) {
+      throw Exception('Erro ao carregar perfil: $e');
+    }
   }
 }

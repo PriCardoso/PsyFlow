@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/invite_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/services/invite_service.dart';
 
 class InvitePage extends StatefulWidget {
   const InvitePage({super.key});
@@ -101,7 +101,7 @@ class _InvitePageState extends State<InvitePage> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -124,7 +124,7 @@ class _InvitePageState extends State<InvitePage> {
                           'O paciente usa o código para se vincular a você. Válido por 7 dias.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 13,
                           ),
                         ),
@@ -218,7 +218,7 @@ class _InvitePageState extends State<InvitePage> {
                       child: Column(
                         children: [
                           Icon(Icons.people_outline_rounded,
-                              size: 40, color: AppColors.textSecondary.withOpacity(0.5)),
+                              size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
                           const SizedBox(height: 10),
                           const Text(
                             'Nenhum paciente vinculado ainda',
@@ -238,7 +238,7 @@ class _InvitePageState extends State<InvitePage> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -250,7 +250,7 @@ class _InvitePageState extends State<InvitePage> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: AppColors.patient.withOpacity(0.12),
+                                color: AppColors.patient.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Icon(Icons.person_rounded,
@@ -282,7 +282,7 @@ class _InvitePageState extends State<InvitePage> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppColors.success.withOpacity(0.12),
+                                color: AppColors.success.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Text(

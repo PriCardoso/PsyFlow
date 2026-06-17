@@ -108,7 +108,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -136,7 +136,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     Text(
                       'Passo 2 de 2 — Quase lá!',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                     ),
@@ -233,7 +233,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: roleColor.withOpacity(0.35),
+                              color: roleColor.withValues(alpha: 0.35),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
