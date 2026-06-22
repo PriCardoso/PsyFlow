@@ -141,3 +141,17 @@ class TaskService {
     }
   }
 }
+
+  /// Psicólogo salva anotação clínica sobre a resposta do paciente
+  Future<void> saveTherapistNotes({
+    required String taskId,
+    required String notes,
+  }) async {
+    try {
+      await supabase.from('tasks').update({
+        'therapist_notes': notes,
+      }).eq('id', taskId);
+    } catch (e) {
+      throw Exception('Erro ao salvar anotação: $e');
+    }
+  }
