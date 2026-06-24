@@ -33,8 +33,6 @@ class TaskService {
     }
   }
 
-  
-
   /// Psicólogo vê todas as tarefas que criou (com nome do paciente)
   Future<List<TaskItem>> getTasksCreatedByMe() async {
     final user = supabase.auth.currentUser;
@@ -43,7 +41,7 @@ class TaskService {
     try {
       final data = await supabase
           .from('tasks')
-          .select('*, patient:patient_id(full_name)')
+          .select('*, patient:patient_id(user_id, users(full_name))')
           .eq('psychologist_id', user.id)
           .order('due_date', ascending: true);
 
@@ -96,6 +94,7 @@ class TaskService {
     }
   }
 
+  /// Paciente conclui uma tarefa com resposta e humor
   Future<void> completeTask({
     required String taskId,
     required String response,
@@ -114,9 +113,7 @@ class TaskService {
           })
           .eq('id', taskId);
     } catch (e) {
-      throw Exception(
-        'Erro ao concluir tarefa: $e',
-      );
+      throw Exception('Erro ao concluir tarefa: $e');
     }
   }
 
@@ -140,7 +137,6 @@ class TaskService {
       throw Exception('Erro ao excluir tarefa: $e');
     }
   }
-}
 
   /// Psicólogo salva anotação clínica sobre a resposta do paciente
   Future<void> saveTherapistNotes({
@@ -155,3 +151,4 @@ class TaskService {
       throw Exception('Erro ao salvar anotação: $e');
     }
   }
+}

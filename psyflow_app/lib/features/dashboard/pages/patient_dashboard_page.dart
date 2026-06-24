@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
-import '../../../models/appointment_model.dart';
+import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
@@ -21,7 +21,8 @@ class PatientDashboardPage extends StatefulWidget {
 }
 
 class _PatientDashboardPageState extends State<PatientDashboardPage> {
-  final _appointmentService = AppointmentService();
+  final _appointmentService =
+    AppointmentService(Supabase.instance.client);
   String? userName;
   String? userEmail;
   List<AppointmentItem> _appointments = [];

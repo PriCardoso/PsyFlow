@@ -4,6 +4,8 @@ import '../../core/services/task_service.dart';
 import '../../core/services/invite_service.dart';
 import '../../models/task_model.dart';
 import '../../models/patient_link_model.dart';
+import '../../models/task_template_model.dart';
+import '../../data/task_templates.dart';
 
 class PsychologistTasksPage extends StatefulWidget {
   const PsychologistTasksPage({super.key});
@@ -324,6 +326,47 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
   DateTime? selectedDate;
   bool saving = false;
 
+  // Modelo pronto selecionado (se houver) e os campos que ele preenche.
+  TaskTemplate? selectedTemplate;
+  String? selectedTemplateCategory;
+  String? category;
+  String? protocol;
+  int difficultyLevel = 1;
+
+  void _applyTemplate(TaskTemplate template) {
+    setState(() {
+      selectedTemplate = template;
+      titleController.text = template.title;
+      descController.text = template.fullDescription;
+      category = template.category;
+      protocol = template.protocol;
+      difficultyLevel = template.difficultyLevel;
+    });
+  }
+
+  void _clearTemplate() {
+    setState(() {
+      selectedTemplate = null;
+      category = null;
+      protocol = null;
+      difficultyLevel = 1;
+    });
+  }
+
+  Future<void> _openTemplatePicker() async {
+    final picked = await showModalBottomSheet<TaskTemplate>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TemplatePickerSheet(initialCategory: selectedTemplateCategory),
+    );
+    if (picked != null) {
+      selectedTemplateCategory = picked.category;
+      _applyTemplate(picked);
+    }
+  }
+
+
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
@@ -353,6 +396,9 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
         patientId: selectedPatientId!,
         title: titleController.text.trim(),
         description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+        category: category,
+        protocol: protocol,
+        difficultyLevel: difficultyLevel,
         dueDate: selectedDate,
       );
       if (mounted) Navigator.pop(context, true);
@@ -405,7 +451,49 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
               ),
               const SizedBox(height: 20),
               const Text('Nova tarefa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Atalho para escolher um modelo pronto
+              GestureDetector(
+                onTap: _openTemplatePicker,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.psychologist.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.psychologist.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.psychologist),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          selectedTemplate == null
+                              ? 'Usar um modelo pronto de tarefa'
+                              : 'Modelo: ${selectedTemplate!.title}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.psychologist,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (selectedTemplate != null)
+                        GestureDetector(
+                          onTap: _clearTemplate,
+                          child: Icon(Icons.close_rounded, size: 18, color: AppColors.psychologist),
+                        )
+                      else
+                        Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.psychologist),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
 
               // Paciente
               const Text('Paciente', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
@@ -490,6 +578,263 @@ class _CreateTaskSheetState extends State<_CreateTaskSheet> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet com a lista de modelos de tarefa prontos (TaskTemplates),
+/// com busca por texto e filtro por categoria. Ao tocar em um modelo, ele é
+/// devolvido para o _CreateTaskSheet via Navigator.pop.
+class _TemplatePickerSheet extends StatefulWidget {
+  final String? initialCategory;
+
+  const _TemplatePickerSheet({this.initialCategory});
+
+  @override
+  State<_TemplatePickerSheet> createState() => _TemplatePickerSheetState();
+}
+
+class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
+  late List<TaskTemplate> _all;
+  late List<TaskTemplate> _filtered;
+  String? _selectedCategory;
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _all = TaskTemplates.all;
+    _selectedCategory = widget.initialCategory;
+    _filtered = _all;
+    _applyFilter();
+  }
+
+  void _applyFilter() {
+    setState(() {
+      _filtered = _all.where((t) {
+        final matchCat = _selectedCategory == null || t.category == _selectedCategory;
+        final matchSearch = _search.isEmpty ||
+            t.title.toLowerCase().contains(_search.toLowerCase()) ||
+            t.description.toLowerCase().contains(_search.toLowerCase());
+        return matchCat && matchSearch;
+      }).toList();
+    });
+  }
+
+  List<String> get _categories {
+    final cats = _all.map((t) => t.category).toSet().toList();
+    cats.sort();
+    return cats;
+  }
+
+  Color _difficultyColor(int level) {
+    return switch (level) {
+      1 => AppColors.cardGreen,
+      2 => AppColors.cardOrange,
+      _ => AppColors.error,
+    };
+  }
+
+  String _difficultyLabel(int level) {
+    return switch (level) {
+      1 => 'Fácil',
+      2 => 'Médio',
+      _ => 'Avançado',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textSecondary.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Modelos de tarefa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Column(
+                  children: [
+                    TextField(
+                      onChanged: (v) {
+                        _search = v;
+                        _applyFilter();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Buscar modelo...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary),
+                        filled: true,
+                        fillColor: AppColors.background,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _CategoryChip(
+                            label: 'Todas',
+                            selected: _selectedCategory == null,
+                            onTap: () {
+                              _selectedCategory = null;
+                              _applyFilter();
+                            },
+                          ),
+                          ..._categories.map((cat) => _CategoryChip(
+                                label: TaskTemplates.categoryLabels[cat] ?? cat,
+                                selected: _selectedCategory == cat,
+                                onTap: () {
+                                  _selectedCategory = cat == _selectedCategory ? null : cat;
+                                  _applyFilter();
+                                },
+                              )),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _filtered.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                            const SizedBox(height: 12),
+                            const Text('Nenhum modelo encontrado', style: TextStyle(color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        itemCount: _filtered.length,
+                        itemBuilder: (_, i) {
+                          final t = _filtered[i];
+                          return GestureDetector(
+                            onTap: () => Navigator.pop(context, t),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFFE7ECF1)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t.title,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    t.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: _difficultyColor(t.difficultyLevel).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _difficultyLabel(t.difficultyLevel),
+                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _difficultyColor(t.difficultyLevel)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        t.categoryLabel,
+                                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Chip de filtro de categoria reutilizado dentro do seletor de modelos.
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.psychologist : AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.psychologist : const Color(0xFFE0E7EF)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textSecondary,
           ),
         ),
       ),

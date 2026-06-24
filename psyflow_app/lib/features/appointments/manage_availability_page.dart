@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/appointment_service.dart';
-import '../../models/appointment_model.dart';
+import '../../models/appointment_item.dart';
+import '../../models/psychologist_summary.dart';
+import '../../models/availability_slot.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ManageAvailabilityPage extends StatefulWidget {
   const ManageAvailabilityPage({super.key});
@@ -11,7 +14,8 @@ class ManageAvailabilityPage extends StatefulWidget {
 }
 
 class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
-  final _service = AppointmentService();
+  final _appointmentService =
+    AppointmentService(Supabase.instance.client);
   List<AvailabilitySlot> _slots = [];
   List<AppointmentItem> _appointments = [];
   bool _loading = true;

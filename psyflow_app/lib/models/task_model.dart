@@ -59,10 +59,13 @@ class TaskItem {
     String? patientName;
 
     if (map['patient'] != null) {
-      patientName = map['patient']['full_name'];
+      final users = map['patient']['users'];
+      if (users != null) {
+        patientName = users['full_name'];
+      }
     }
 
-    return TaskItem(
+  return TaskItem(
       id: map['id'],
       patientId: map['patient_id'],
       psychologistId: map['psychologist_id'],

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/appointment_service.dart';
-import '../../models/appointment_model.dart';
+import '../../models/appointment_item.dart';
+import '../../models/psychologist_summary.dart';
+import '../../models/availability_slot.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BookAppointmentPage extends StatefulWidget {
   const BookAppointmentPage({super.key});
@@ -11,7 +14,8 @@ class BookAppointmentPage extends StatefulWidget {
 }
 
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
-  final _service = AppointmentService();
+  final _appointmentService =
+    AppointmentService(Supabase.instance.client);
   List<PsychologistSummary> _psychologists = [];
   List<AppointmentItem> _myAppointments = [];
   bool _loading = true;
@@ -339,7 +343,12 @@ class _SlotPickerSheetState extends State<_SlotPickerSheet> {
 
     setState(() => _booking = true);
     try {
-      await widget.service.bookAppointment(psychologistId: widget.psychologist.id, slot: slot);
+      await widget.service.bookAppointment(
+        psychologistId: widget.psychologist.id,
+        patientId: Supabase.instance.client.auth.currentUser!.id,
+        slot: slot,
+        modality: slot.modality,
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
