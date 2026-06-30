@@ -1,8 +1,10 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/mood_model.dart';
 
 class MoodService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Paciente registra como está se sentindo hoje
   Future<void> addEntry({
@@ -11,16 +13,17 @@ class MoodService {
     required int energy,
     String? notes,
   }) async {
-    final user = supabase.auth.currentUser;
+    final user = _auth.currentUser;
     if (user == null) throw Exception('Usuário não autenticado.');
 
     try {
-      await supabase.from('mood_entries').insert({
-        'patient_id': user.id,
+      await _db.collection('mood_entries').add({
+        'patient_id': user.uid,
         'mood': mood,
         'anxiety': anxiety,
         'energy': energy,
         'notes': notes,
+        'created_at': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       throw Exception('Erro ao registrar humor: $e');
@@ -29,19 +32,19 @@ class MoodService {
 
   /// Paciente vê seu próprio histórico
   Future<List<MoodEntry>> getMyEntries({int limit = 30}) async {
-    final user = supabase.auth.currentUser;
+    final user = _auth.currentUser;
     if (user == null) throw Exception('Usuário não autenticado.');
 
     try {
-      final data = await supabase
-          .from('mood_entries')
-          .select()
-          .eq('patient_id', user.id)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final snap = await _db
+          .collection('mood_entries')
+          .where('patient_id', isEqualTo: user.uid)
+          .orderBy('created_at', descending: true)
+          .limit(limit)
+          .get();
 
-      return (data as List)
-          .map((item) => MoodEntry.fromMap(item as Map<String, dynamic>))
+      return snap.docs
+          .map((d) => MoodEntry.fromMap({'id': d.id, ...d.data()}))
           .toList();
     } catch (e) {
       throw Exception('Erro ao buscar histórico: $e');
@@ -49,17 +52,18 @@ class MoodService {
   }
 
   /// Psicólogo vê o histórico de humor de um paciente vinculado
-  Future<List<MoodEntry>> getPatientEntries(String patientId, {int limit = 30}) async {
+  Future<List<MoodEntry>> getPatientEntries(String patientId,
+      {int limit = 30}) async {
     try {
-      final data = await supabase
-          .from('mood_entries')
-          .select()
-          .eq('patient_id', patientId)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final snap = await _db
+          .collection('mood_entries')
+          .where('patient_id', isEqualTo: patientId)
+          .orderBy('created_at', descending: true)
+          .limit(limit)
+          .get();
 
-      return (data as List)
-          .map((item) => MoodEntry.fromMap(item as Map<String, dynamic>))
+      return snap.docs
+          .map((d) => MoodEntry.fromMap({'id': d.id, ...d.data()}))
           .toList();
     } catch (e) {
       throw Exception('Erro ao buscar histórico do paciente: $e');
@@ -68,21 +72,21 @@ class MoodService {
 
   /// Verifica se o paciente já registrou hoje
   Future<bool> hasEntryToday() async {
-    final user = supabase.auth.currentUser;
+    final user = _auth.currentUser;
     if (user == null) return false;
 
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
+    final startOfDay = DateTime(now.year, now.month, now.day);
 
     try {
-      final data = await supabase
-          .from('mood_entries')
-          .select('id')
-          .eq('patient_id', user.id)
-          .gte('created_at', startOfDay)
-          .limit(1);
+      final snap = await _db
+          .collection('mood_entries')
+          .where('patient_id', isEqualTo: user.uid)
+          .where('created_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .limit(1)
+          .get();
 
-      return (data as List).isNotEmpty;
+      return snap.docs.isNotEmpty;
     } catch (_) {
       return false;
     }

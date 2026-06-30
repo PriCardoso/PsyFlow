@@ -1,102 +1,111 @@
-class TaskItem {
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class TaskModel {
   final String id;
+
   final String patientId;
+
   final String psychologistId;
 
   final String title;
-  final String? description;
+
+  final String description;
 
   final String category;
+
   final String protocol;
 
-  final int difficultyLevel;
-
-  final String status;
+  final int difficulty;
 
   final DateTime createdAt;
-  final DateTime? completedAt;
 
   final DateTime? dueDate;
 
-  final String? patientResponse;
-  final String? therapistNotes;
+  final DateTime? completedAt;
+
+  final String status;
+
+  final String? response;
 
   final int? moodBefore;
+
   final int? moodAfter;
 
-  final String? patientName;
+  final String? therapistNotes;
 
-  const TaskItem({
+  const TaskModel({
     required this.id,
     required this.patientId,
     required this.psychologistId,
     required this.title,
-    this.description,
+    required this.description,
     required this.category,
     required this.protocol,
-    required this.difficultyLevel,
-    required this.status,
+    required this.difficulty,
     required this.createdAt,
+    required this.status,
     this.completedAt,
     this.dueDate,
-    this.patientResponse,
-    this.therapistNotes,
+    this.response,
     this.moodBefore,
     this.moodAfter,
-    this.patientName,
+    this.therapistNotes,
   });
 
-  bool get isCompleted => status == 'completed';
+  bool get completed => status == "completed";
 
-  bool get isOverdue {
-    if (isCompleted) return false;
+  bool get overdue {
     if (dueDate == null) return false;
+    if (completed) return false;
 
-    return dueDate!.isBefore(DateTime.now());
+    return DateTime.now().isAfter(dueDate!);
   }
 
-  factory TaskItem.fromMap(Map<String, dynamic> map) {
-    String? patientName;
-
-    if (map['patient'] != null) {
-      final users = map['patient']['users'];
-      if (users != null) {
-        patientName = users['full_name'];
-      }
-    }
-
-  return TaskItem(
-      id: map['id'],
-      patientId: map['patient_id'],
-      psychologistId: map['psychologist_id'],
-
-      title: map['title'] ?? '',
-      description: map['description'],
-
-      category: map['category'] ?? 'geral',
-      protocol: map['protocol'] ?? '',
-
-      difficultyLevel: map['difficulty_level'] ?? 1,
-
-      status: map['status'] ?? 'pending',
-
-      createdAt: DateTime.parse(map['created_at']),
-
-      completedAt: map['completed_at'] != null
-          ? DateTime.parse(map['completed_at'])
+  factory TaskModel.fromMap(
+      String id,
+      Map<String, dynamic> map) {
+    return TaskModel(
+      id: id,
+      patientId: map["patientId"],
+      psychologistId: map["psychologistId"],
+      title: map["title"],
+      description: map["description"],
+      category: map["category"],
+      protocol: map["protocol"],
+      difficulty: map["difficulty"],
+      status: map["status"],
+      createdAt:
+          (map["createdAt"] as Timestamp).toDate(),
+      completedAt: map["completedAt"] != null
+          ? (map["completedAt"] as Timestamp).toDate()
           : null,
-
-      dueDate: map['due_date'] != null
-          ? DateTime.parse(map['due_date'])
+      dueDate: map["dueDate"] != null
+          ? (map["dueDate"] as Timestamp).toDate()
           : null,
-
-      patientResponse: map['patient_response'],
-      therapistNotes: map['therapist_notes'],
-
-      moodBefore: map['mood_before'],
-      moodAfter: map['mood_after'],
-
-      patientName: patientName,
+      response: map["response"],
+      moodBefore: map["moodBefore"],
+      moodAfter: map["moodAfter"],
+      therapistNotes: map["therapistNotes"],
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      "patientId": patientId,
+      "psychologistId": psychologistId,
+      "title": title,
+      "description": description,
+      "category": category,
+      "protocol": protocol,
+      "difficulty": difficulty,
+      "createdAt": createdAt,
+      "completedAt": completedAt,
+      "dueDate": dueDate,
+      "status": status,
+      "response": response,
+      "moodBefore": moodBefore,
+      "moodAfter": moodAfter,
+      "therapistNotes": therapistNotes,
+    };
   }
 }
