@@ -19,6 +19,10 @@ class UserModel {
 
   final String? phone;
 
+  final String? crp;
+
+  final String? bio;
+
   final DateTime createdAt;
 
   final bool active;
@@ -31,6 +35,8 @@ class UserModel {
     required this.createdAt,
     this.photoUrl,
     this.phone,
+    this.crp,
+    this.bio,
     this.active = true,
   });
 
@@ -48,6 +54,8 @@ class UserModel {
       ),
       phone: map["phone"],
       photoUrl: map["photoUrl"],
+      crp: map["crp"],
+      bio: map["bio"],
       active: map["active"] ?? true,
       createdAt:
           (map["createdAt"] as Timestamp).toDate(),
@@ -61,6 +69,8 @@ class UserModel {
       "role": role.name,
       "phone": phone,
       "photoUrl": photoUrl,
+      "crp": crp,
+      "bio": bio,
       "active": active,
       "createdAt": createdAt,
     };

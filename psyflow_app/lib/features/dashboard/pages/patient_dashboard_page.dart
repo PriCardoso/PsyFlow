@@ -38,8 +38,13 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     try {
-      final appts = await _appointmentService.getMyAppointmentsAsPatient();
+      final appts = await _appointmentService.getMyAppointmentsAsPatient(user.uid);
       if (mounted) setState(() => _appointments = appts);
     } catch (_) {}
     if (mounted) setState(() => _loading = false);

@@ -29,12 +29,17 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     try {
       final data = await _appointmentService.listAvailablePsychologists();
-      final appts = await _appointmentService.getMyAppointmentsAsPatient();
+      final appts = await _appointmentService.getMyAppointmentsAsPatient(user.uid);
       if (mounted) {
         setState(() {
-          _psychologists = data.map((m) => PsychologistSummary.fromMap(m)).toList();
+          _psychologists = data;
           _myAppointments = appts;
         });
       }

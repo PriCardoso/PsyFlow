@@ -1,10 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import '../../models/task_model.dart';
+import '../../models/task_item.dart';
 
 class TaskService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// Stream de tarefas para um paciente (tempo real)
+  Stream<List<TaskItem>> tasksStreamForPatient(String patientId) {
+    return _db
+        .collection('tasks')
+        .where('patient_id', isEqualTo: patientId)
+        .orderBy('due_date')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
+            .toList());
+  }
+
+  /// Stream de tarefas para um psicólogo (tempo real)
+  Stream<List<TaskItem>> tasksStreamForPsychologist(String psychologistId) {
+    return _db
+        .collection('tasks')
+        .where('psychologist_id', isEqualTo: psychologistId)
+        .orderBy('due_date')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
+            .toList());
+  }
 
   /// Psicólogo cria uma tarefa para um paciente
   Future<void> createTask({

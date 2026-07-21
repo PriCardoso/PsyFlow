@@ -28,6 +28,12 @@ class AppColors {
   static const gradientEnd = Color(0xff00A86B);
 
   static const gradientStart = Color(0xff6C63FF);
+
+  static const cardOrange = Color(0xFFFF9800);
+
+  static const cardGreen = Color(0xFF4CAF50);
+
+  static const cardRed = Color(0xFFF44336);
 }
 
 class AppTheme {

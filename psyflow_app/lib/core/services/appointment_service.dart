@@ -8,6 +8,41 @@ class AppointmentService {
 
   AppointmentService(this._db);
 
+  // Stream methods for real-time updates
+  Stream<List<AppointmentItem>> appointmentsStreamForPatient(String userId) {
+    return _db
+        .collection('appointments')
+        .where('patient_id', isEqualTo: userId)
+        .orderBy('scheduled_date', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => AppointmentItem.fromMap({'id': d.id, ...d.data()}))
+            .toList());
+  }
+
+  Stream<List<AppointmentItem>> appointmentsStreamForPsychologist(String userId) {
+    return _db
+        .collection('appointments')
+        .where('psychologist_id', isEqualTo: userId)
+        .orderBy('scheduled_date', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => AppointmentItem.fromMap({'id': d.id, ...d.data()}))
+            .toList());
+  }
+
+  Stream<List<AvailabilitySlot>> slotsStreamForPsychologist(String psychologistId) {
+    return _db
+        .collection('availability_slots')
+        .where('psychologist_id', isEqualTo: psychologistId)
+        .orderBy('date')
+        .orderBy('start_time')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => AvailabilitySlot.fromMap({'id': d.id, ...d.data()}))
+            .toList());
+  }
+
   Future<List<AppointmentItem>> getMyAppointmentsAsPatient(
       String userId) async {
     final snap = await _db
@@ -29,6 +64,17 @@ class AppointmentService {
 
     return snap.docs
         .map((d) => AppointmentItem.fromMap({'id': d.id, ...d.data()}))
+        .toList();
+  }
+
+  Future<List<AvailabilitySlot>> getMySlots(String psychologistId) async {
+    final snap = await _db
+        .collection('availability_slots')
+        .where('psychologist_id', isEqualTo: psychologistId)
+        .get();
+
+    return snap.docs
+        .map((d) => AvailabilitySlot.fromMap({'id': d.id, ...d.data()}))
         .toList();
   }
 
@@ -100,6 +146,12 @@ class AppointmentService {
         'status': 'scheduled',
         'created_at': FieldValue.serverTimestamp(),
       });
+    });
+  }
+
+  Future<void> cancelAppointment(String appointmentId) async {
+    await _db.collection('appointments').doc(appointmentId).update({
+      'status': 'cancelled',
     });
   }
 }

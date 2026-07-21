@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
 import '../../core/services/invite_service.dart';
-import '../../models/task_model.dart';
+import '../../models/task_item.dart';
 import '../../models/patient_link_model.dart';
 
 class PsychologistTasksPage extends StatefulWidget {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
 import '../../core/services/invite_service.dart';
-import '../../models/task_model.dart';
+import '../../models/task_item.dart';
 import '../../models/patient_link_model.dart';
 import '../../models/task_template_model.dart';
 import '../../data/task_templates.dart';
@@ -718,7 +718,7 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
                             },
                           ),
                           ..._categories.map((cat) => _CategoryChip(
-                                label: TaskTemplates.categoryLabels[cat] ?? cat,
+                                label: TaskTemplates.categoryToLabel[cat] ?? cat,
                                 selected: _selectedCategory == cat,
                                 onTap: () {
                                   _selectedCategory = cat == _selectedCategory ? null : cat;

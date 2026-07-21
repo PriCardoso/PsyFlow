@@ -98,7 +98,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     if (confirm == true) {
-      await AuthService().logout();
+      await AuthService.instance.logout();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,

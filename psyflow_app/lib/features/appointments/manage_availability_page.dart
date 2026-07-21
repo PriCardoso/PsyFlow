@@ -71,7 +71,13 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
     final end = start.add(const Duration(minutes: 50));
 
     try {
-      await _service.addAvailabilitySlot(startTime: start, endTime: end);
+      await _appointmentService.addAvailabilitySlot(
+        psychologistId: FirebaseAuth.instance.currentUser!.uid,
+        date: date,
+        startTime: start,
+        endTime: end,
+        modality: 'online', // default
+      );
       _load();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -80,7 +86,7 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
 
   Future<void> _removeSlot(AvailabilitySlot slot) async {
     try {
-      await _service.deleteSlot(slot.id);
+      await _appointmentService.deleteSlot(slot.id);
       _load();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));

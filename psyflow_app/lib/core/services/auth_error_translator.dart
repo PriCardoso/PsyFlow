@@ -1,52 +1,48 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-/// Traduz erros de autenticação do Supabase para mensagens em português,
+/// Traduz erros de autenticação do Firebase para mensagens em português,
 /// mais claras para o usuário final.
 class AuthErrorTranslator {
   static String translate(Object error) {
-    if (error is AuthException) {
-      final msg = error.message.toLowerCase();
+    if (error is FirebaseAuthException) {
+      final code = error.code;
 
-      // Credenciais inválidas (e-mail não cadastrado OU senha errada —
-      // o Supabase não diferencia por segurança, então usamos uma
-      // mensagem que cobre os dois casos sem expor qual deles é)
-      if (msg.contains('invalid login credentials') ||
-          msg.contains('invalid email or password')) {
+      // Credenciais inválidas
+      if (code == 'user-not-found' || code == 'wrong-password' || code == 'invalid-credential') {
         return 'Usuário e/ou senha incorretos.';
       }
 
       // E-mail não confirmado
-      if (msg.contains('email not confirmed')) {
+      if (code == 'unverified-email') {
         return 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.';
       }
 
       // Usuário já existe (no cadastro)
-      if (msg.contains('user already registered') ||
-          msg.contains('already registered')) {
+      if (code == 'email-already-in-use') {
         return 'Este e-mail já está cadastrado. Tente fazer login.';
       }
 
       // E-mail inválido
-      if (msg.contains('invalid email') || msg.contains('unable to validate email')) {
+      if (code == 'invalid-email') {
         return 'Informe um e-mail válido.';
       }
 
       // Senha muito curta / fraca
-      if (msg.contains('password should be at least') || msg.contains('weak password')) {
+      if (code == 'weak-password') {
         return 'A senha deve ter no mínimo 6 caracteres.';
       }
 
       // Muitas tentativas
-      if (msg.contains('rate limit') || msg.contains('too many requests')) {
+      if (code == 'too-many-requests') {
         return 'Muitas tentativas. Aguarde um momento e tente novamente.';
       }
 
-      // Usuário não encontrado (alguns fluxos do Supabase retornam isso)
-      if (msg.contains('user not found')) {
-        return 'Usuário não cadastrado.';
+      // Operação não permitida
+      if (code == 'operation-not-allowed') {
+        return 'Esta operação não está habilitada. Contate o suporte.';
       }
 
-      return error.message;
+      return error.message ?? 'Ocorreu um erro de autenticação.';
     }
 
     return 'Ocorreu um erro. Tente novamente.';

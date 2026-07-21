@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
-import '../../models/task_model.dart';
+import '../../models/task_item.dart';
 
 class PatientTasksPage extends StatefulWidget {
   const PatientTasksPage({super.key});

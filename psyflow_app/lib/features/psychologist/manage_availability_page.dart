@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/appointment_service.dart';
-import '../../models/appointment_model.dart';
+import '../../models/appointment_item.dart';
+import '../../models/availability_slot.dart';
 
 class ManageAvailabilityPage extends StatefulWidget {
   const ManageAvailabilityPage({super.key});
@@ -11,7 +14,7 @@ class ManageAvailabilityPage extends StatefulWidget {
 }
 
 class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
-  final _service = AppointmentService();
+  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
   List<AvailabilitySlot> _slots = [];
   List<AppointmentItem> _appointments = [];
   bool _loading = true;
@@ -23,10 +26,13 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
   }
 
   Future<void> _load() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
     setState(() => _loading = true);
     try {
-      final slots = await _service.getMySlots();
-      final appts = await _service.getMyAppointmentsAsPsychologist();
+      final slots = await _appointmentService.getAvailableSlotsForPsychologist(user.uid);
+      final appts = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
       if (mounted) setState(() { _slots = slots; _appointments = appts; });
     } catch (e) {
       if (mounted) _showError(e.toString().replaceAll('Exception: ', ''));
@@ -64,7 +70,13 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
     final end = start.add(const Duration(minutes: 50));
 
     try {
-      await _service.addAvailabilitySlot(startTime: start, endTime: end);
+      await _appointmentService.addAvailabilitySlot(
+        psychologistId: FirebaseAuth.instance.currentUser!.uid,
+        date: date,
+        startTime: start,
+        endTime: end,
+        modality: 'online',
+      );
       _load();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -73,7 +85,7 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
 
   Future<void> _removeSlot(AvailabilitySlot slot) async {
     try {
-      await _service.deleteSlot(slot.id);
+      await _appointmentService.deleteSlot(slot.id);
       _load();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));

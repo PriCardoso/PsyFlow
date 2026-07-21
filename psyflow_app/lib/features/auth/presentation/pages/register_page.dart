@@ -32,7 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => loading = true);
 
     try {
-      await AuthService().register(
+      await AuthService.instance.register(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );

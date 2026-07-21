@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/auth_error_translator.dart';
@@ -25,12 +25,12 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => loading = true);
 
     try {
-      await AuthService().login(
+      await AuthService.instance.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
       // AuthGate in main.dart handles navigation after login
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (mounted) {
         _showError(AuthErrorTranslator.translate(e));
       }

@@ -41,8 +41,13 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     try {
-      final appts = await _appointmentService.getMyAppointmentsAsPsychologist();
+      final appts = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
       final patients = await _inviteService.getMyPatients();
       if (mounted) {
         setState(() {

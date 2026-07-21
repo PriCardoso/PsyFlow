@@ -3,7 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/services/mood_service.dart';
 import '../../../core/services/task_service.dart';
 import '../../../models/mood_model.dart';
-import '../../../models/task_model.dart';
+import '../../../models/task_item.dart';
 
 class ClinicalAlert {
   final String title;
@@ -159,7 +159,7 @@ class _ClinicalAlertsWidgetState extends State<ClinicalAlertsWidget> {
   Color _levelColor(AlertLevel level) {
     return switch (level) {
       AlertLevel.high => AppColors.error,
-      AlertLevel.medium => AppColors.cardOrange,
+      AlertLevel.medium => AppColors.accentLight,
       AlertLevel.low => AppColors.psychologist,
     };
   }
@@ -167,7 +167,7 @@ class _ClinicalAlertsWidgetState extends State<ClinicalAlertsWidget> {
   Color _levelBg(AlertLevel level) {
     return switch (level) {
       AlertLevel.high => AppColors.error.withValues(alpha: 0.08),
-      AlertLevel.medium => AppColors.cardOrange.withValues(alpha: 0.1),
+      AlertLevel.medium => AppColors.accentLight.withValues(alpha: 0.1),
       AlertLevel.low => AppColors.psychologist.withValues(alpha: 0.07),
     };
   }

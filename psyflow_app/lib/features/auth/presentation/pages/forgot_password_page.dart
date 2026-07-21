@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -22,10 +22,8 @@ class _ForgotPasswordPageState
         loading = true;
       });
 
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        emailController.text.trim(),
-        redirectTo:
-            'http://localhost:3000/reset-password',
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: emailController.text.trim(),
       );
 
       if (mounted) {

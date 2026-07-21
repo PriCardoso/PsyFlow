@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/invite_service.dart';
+import '../../models/patient_link_model.dart';
 
 class InvitePage extends StatefulWidget {
   const InvitePage({super.key});
@@ -15,7 +16,7 @@ class _InvitePageState extends State<InvitePage> {
   String? generatedCode;
   bool generating = false;
   List<Map<String, dynamic>> invites = [];
-  List<Map<String, dynamic>> patients = [];
+  List<PatientLink> patients = [];
   bool loadingData = true;
 
   @override
@@ -229,7 +230,7 @@ class _InvitePageState extends State<InvitePage> {
                     )
                   else
                     ...patients.map((link) {
-                      final patient = link['patient'] as Map<String, dynamic>;
+                      final patient = link.patient;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(16),
@@ -262,7 +263,7 @@ class _InvitePageState extends State<InvitePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    patient['full_name'] ?? 'Paciente',
+                                    patient.fullName,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
@@ -270,7 +271,7 @@ class _InvitePageState extends State<InvitePage> {
                                     ),
                                   ),
                                   Text(
-                                    patient['email'] ?? '',
+                                    patient.email,
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,

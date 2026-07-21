@@ -50,7 +50,7 @@ class AppDrawer extends StatelessWidget {
     );
 
     if (confirm == true) {
-      await AuthService().logout();
+      await AuthService.instance.logout();
       if (context.mounted) {
         Navigator.pushAndRemoveUntil(
           context,

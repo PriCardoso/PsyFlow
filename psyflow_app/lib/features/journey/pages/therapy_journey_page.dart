@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/journey_service.dart';
 import '../../../core/services/intervention_service.dart';
@@ -30,7 +30,7 @@ class _TherapyJourneyPageState extends State<TherapyJourneyPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) return;
 
       final journey = await _journeyService.getJourney(userId);
