@@ -1,39 +1,30 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/intervention_template.dart';
 
 class InterventionService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<List<InterventionTemplate>>
-      getTemplates() async {
-    final response = await supabase
-        .from('intervention_templates')
-        .select()
-        .eq('is_active', true)
-        .order('category');
+  Future<List<InterventionTemplate>> getTemplates() async {
+    final snap = await _db
+        .collection('intervention_templates')
+        .where('is_active', isEqualTo: true)
+        .orderBy('category')
+        .get();
 
-    return (response as List)
-        .map(
-          (e) => InterventionTemplate.fromMap(e),
-        )
+    return snap.docs
+        .map((d) => InterventionTemplate.fromMap({'id': d.id, ...d.data()}))
         .toList();
   }
 
-  Future<List<InterventionTemplate>>
-      getByCategory(
-    String category,
-  ) async {
-    final response = await supabase
-        .from('intervention_templates')
-        .select()
-        .eq('category', category)
-        .eq('is_active', true);
+  Future<List<InterventionTemplate>> getByCategory(String category) async {
+    final snap = await _db
+        .collection('intervention_templates')
+        .where('category', isEqualTo: category)
+        .where('is_active', isEqualTo: true)
+        .get();
 
-    return (response as List)
-        .map(
-          (e) => InterventionTemplate.fromMap(e),
-        )
+    return snap.docs
+        .map((d) => InterventionTemplate.fromMap({'id': d.id, ...d.data()}))
         .toList();
   }
 }

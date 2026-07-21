@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/user_service.dart';
 import 'pages/login_page.dart';
@@ -9,130 +8,121 @@ import '../../dashboard/pages/psychologist_dashboard_page.dart';
 import 'pages/reset_password_page.dart';
 import '../../dashboard/pages/patient_dashboard_page.dart';
 
-class AuthGate extends StatefulWidget {
+class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
+        if (snapshot.hasData) {
+          return _ProfileFutureBuilder(user: snapshot.data!);
+        }
+        return const LoginPage();
+      },
+    );
+  }
 }
 
-class _AuthGateState extends State<AuthGate> {
-  final supabase = Supabase.instance.client;
+class _ProfileFutureBuilder extends StatefulWidget {
+  final User user;
+  const _ProfileFutureBuilder({required this.user});
+
+  @override
+  State<_ProfileFutureBuilder> createState() => _ProfileFutureBuilderState();
+}
+
+class _ProfileFutureBuilderState extends State<_ProfileFutureBuilder> {
   Future<Map<String, dynamic>?>? _profileFuture;
   String? _lastUserId;
-  bool _isRecoveryMode = false; // 👈 novo
 
   @override
   void initState() {
     super.initState();
-    _checkRecoveryFromUrl(); // 👈 novo
     _updateProfileFuture();
   }
 
-  // 👇 detecta o ?code= na URL ao abrir o app (Flutter Web)
-  void _checkRecoveryFromUrl() {
-    if (!kIsWeb) return;
-
-    final uri = Uri.base;
-    final code = uri.queryParameters['code'];
-
-    if (code != null && code.isNotEmpty) {
-      setState(() => _isRecoveryMode = true);
+  @override
+  void didUpdateWidget(covariant _ProfileFutureBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.uid != widget.user.uid) {
+      _updateProfileFuture();
     }
   }
 
   void _updateProfileFuture() {
-    final user = supabase.auth.currentUser;
-    if (user != null && user.id != _lastUserId) {
-      _lastUserId = user.id;
+    if (widget.user.uid != _lastUserId) {
+      _lastUserId = widget.user.uid;
       _profileFuture = UserService().getProfile();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 👇 se detectou ?code= na URL, vai direto para reset
-    if (_isRecoveryMode) {
-      return const ResetPasswordPage();
-    }
-
-    return StreamBuilder<AuthState>(
-      stream: supabase.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final session = supabase.auth.currentSession;
-
-        final recovery =
-            snapshot.data?.event == AuthChangeEvent.passwordRecovery;
-
-        if (recovery) {
-          return const ResetPasswordPage();
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _profileFuture,
+      builder: (context, profileSnapshot) {
+        if (profileSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
         }
 
-        if (session == null) {
-          _lastUserId = null;
-          _profileFuture = null;
-          return const LoginPage();
-        }
-
-        _updateProfileFuture();
-
-        return FutureBuilder<Map<String, dynamic>?>(
-          future: _profileFuture,
-          builder: (context, profileSnapshot) {
-            if (profileSnapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                backgroundColor: AppColors.background,
-                body: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              );
-            }
-
-            if (profileSnapshot.hasError) {
-              return Scaffold(
-                backgroundColor: AppColors.background,
-                body: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, color: AppColors.error, size: 48),
-                      const SizedBox(height: 12),
-                      const Text('Erro ao carregar perfil.'),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: () => setState(() {
-                          _lastUserId = null;
-                          _updateProfileFuture();
-                        }),
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ],
+        if (profileSnapshot.hasError) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                  const SizedBox(height: 12),
+                  const Text('Erro ao carregar perfil.'),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => setState(() {
+                      _lastUserId = null;
+                      _updateProfileFuture();
+                    }),
+                    child: const Text('Tentar novamente'),
                   ),
-                ),
-              );
-            }
+                ],
+              ),
+            ),
+          );
+        }
 
-            final profile = profileSnapshot.data;
+        final profile = profileSnapshot.data;
 
-            if (profile == null || profile['profile_complete'] != true) {
-              final role = profile?['role'] as String? ?? 'patient';
-              return CompleteProfilePage(role: role);
-            }
+        if (profile == null || profile['profile_complete'] != true) {
+          final role = profile?['role'] as String? ?? 'patient';
+          return CompleteProfilePage(role: role);
+        }
 
-            final role = profile['role'] as String?;
-            final fullName = profile['full_name'] as String?;
+        final role = profile['role'] as String?;
+        final fullName = profile['full_name'] as String?;
 
-            if (role == 'psychologist') {
-              return PsychologistDashboardPage(initialName: fullName);
-            }
+        if (role == 'psychologist') {
+          return PsychologistDashboardPage(initialName: fullName);
+        }
 
-            if (role == 'patient') {
-              return PatientDashboardPage(initialName: fullName);
-            }
+        if (role == 'patient') {
+          return PatientDashboardPage(initialName: fullName);
+        }
 
-            return const LoginPage();
-          },
-        );
+        return const LoginPage();
       },
     );
   }

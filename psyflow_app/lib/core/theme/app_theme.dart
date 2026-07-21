@@ -12,6 +12,22 @@ class AppColors {
   static const error = Colors.red;
 
   static const text = Color(0xff333333);
+
+  static const textPrimary = Color(0xff333333);
+
+  static const textSecondary = Color(0xff666666);
+
+  static const success = Color(0xff2E7D32);
+
+  static const patient = Color(0xff6C63FF);
+
+  static const psychologist = Color(0xff00A86B);
+
+  static const accentLight = Color(0xffE5B96B);
+
+  static const gradientEnd = Color(0xff00A86B);
+
+  static const gradientStart = Color(0xff6C63FF);
 }
 
 class AppTheme {

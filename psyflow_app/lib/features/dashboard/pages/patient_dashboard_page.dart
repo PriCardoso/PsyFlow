@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
 import '../../../models/appointment_item.dart';
@@ -21,8 +22,7 @@ class PatientDashboardPage extends StatefulWidget {
 }
 
 class _PatientDashboardPageState extends State<PatientDashboardPage> {
-  final _appointmentService =
-    AppointmentService(Supabase.instance.client);
+  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
   String? userName;
   String? userEmail;
   List<AppointmentItem> _appointments = [];
@@ -32,7 +32,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   void initState() {
     super.initState();
     userName = widget.initialName;
-    userEmail = Supabase.instance.client.auth.currentUser?.email;
+    userEmail = FirebaseAuth.instance.currentUser?.email;
     _load();
   }
 

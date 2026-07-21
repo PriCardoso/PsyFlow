@@ -41,7 +41,7 @@ class UserModel {
     return UserModel(
       uid: id,
       email: map["email"] ?? "",
-      fullName: map["fullName"] ?? "",
+      fullName: map["full_name"] ?? map["fullName"] ?? "",
       role: UserRole.values.firstWhere(
         (e) => e.name == map["role"],
         orElse: () => UserRole.patient,

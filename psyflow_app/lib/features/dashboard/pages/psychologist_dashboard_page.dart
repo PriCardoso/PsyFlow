@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
 import '../../../core/services/invite_service.dart';
@@ -21,8 +22,7 @@ class PsychologistDashboardPage extends StatefulWidget {
 }
 
 class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
-  final _appointmentService =
-    AppointmentService(Supabase.instance.client);
+  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
   final _inviteService = InviteService();
 
   String? userName;
@@ -35,7 +35,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
   void initState() {
     super.initState();
     userName = widget.initialName;
-    userEmail = Supabase.instance.client.auth.currentUser?.email;
+    userEmail = FirebaseAuth.instance.currentUser?.email;
     _load();
   }
 

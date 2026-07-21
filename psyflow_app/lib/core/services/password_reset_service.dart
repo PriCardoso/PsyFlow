@@ -1,27 +1,29 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 class PasswordResetService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String generateCode() {
-    final random = Random();
-
-    return (100000 + random.nextInt(900000)).toString();
+  // Opção nativa do Firebase — mais simples, sem código customizado:
+  Future<void> sendNativeResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
   }
 
+  // Fluxo customizado (mantém código de 6 dígitos):
   Future<String> createCode(String email) async {
-    final code = generateCode();
+    final rnd = Random.secure();
+    final code = (100000 + rnd.nextInt(900000)).toString();
 
-    await supabase
-        .from('password_reset_codes')
-        .insert({
+    await _db.collection('password_reset_codes').add({
       'email': email,
       'code': code,
-      'expires_at': DateTime.now()
-          .add(const Duration(minutes: 15))
-          .toIso8601String(),
+      'used': false,
+      'expires_at': Timestamp.fromDate(
+        DateTime.now().add(const Duration(minutes: 15)),
+      ),
+      'created_at': FieldValue.serverTimestamp(),
     });
 
     return code;
@@ -31,36 +33,31 @@ class PasswordResetService {
     required String email,
     required String code,
   }) async {
-    final result = await supabase
-        .from('password_reset_codes')
-        .select()
-        .eq('email', email)
-        .eq('code', code)
-        .eq('used', false)
-        .maybeSingle();
+    final snap = await _db
+        .collection('password_reset_codes')
+        .where('email', isEqualTo: email)
+        .where('code', isEqualTo: code)
+        .where('used', isEqualTo: false)
+        .limit(1)
+        .get();
 
-    if (result == null) {
-      return false;
-    }
+    if (snap.docs.isEmpty) return false;
 
     final expires =
-        DateTime.parse(result['expires_at']);
-
+        (snap.docs.first.data()['expires_at'] as Timestamp).toDate();
     return expires.isAfter(DateTime.now());
   }
 
-  Future<void> markAsUsed(
-    String email,
-    String code,
-  ) async {
-    await supabase
-        .from('password_reset_codes')
-        .update({
-      'used': true,
-    })
-        .match({
-      'email': email,
-      'code': code,
-    });
+  Future<void> markAsUsed(String email, String code) async {
+    final snap = await _db
+        .collection('password_reset_codes')
+        .where('email', isEqualTo: email)
+        .where('code', isEqualTo: code)
+        .limit(1)
+        .get();
+
+    for (final doc in snap.docs) {
+      await doc.reference.update({'used': true});
+    }
   }
 }

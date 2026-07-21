@@ -1,7 +1,7 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RecommendationService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<void> saveRecommendation({
     required String patientId,
@@ -9,26 +9,24 @@ class RecommendationService {
     required String type,
     required String severity,
   }) async {
-    await supabase.from('ai_recommendations').insert({
+    await _db.collection('ai_recommendations').add({
       'patient_id': patientId,
       'recommendation': recommendation,
       'recommendation_type': type,
       'severity': severity,
+      'created_at': FieldValue.serverTimestamp(),
     });
   }
 
   Future<List<Map<String, dynamic>>> getRecommendations(
     String patientId,
   ) async {
-    final data = await supabase
-        .from('ai_recommendations')
-        .select()
-        .eq('patient_id', patientId)
-        .order(
-          'created_at',
-          ascending: false,
-        );
+    final snap = await _db
+        .collection('ai_recommendations')
+        .where('patient_id', isEqualTo: patientId)
+        .orderBy('created_at', descending: true)
+        .get();
 
-    return List<Map<String, dynamic>>.from(data);
+    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 }

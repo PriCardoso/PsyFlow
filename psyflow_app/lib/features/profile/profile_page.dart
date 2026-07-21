@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -12,12 +12,10 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState
     extends State<ProfilePage> {
 
-  final supabase = Supabase.instance.client;
-
-  User? get user => supabase.auth.currentUser;
+  User? get user => FirebaseAuth.instance.currentUser;
 
   Future<void> logout() async {
-    await supabase.auth.signOut();
+    await FirebaseAuth.instance.signOut();
   }
 
   @override

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  final String? code; // 👈 recebe o code da URL
-
-  const ResetPasswordPage({super.key, this.code});
+  const ResetPasswordPage({super.key});
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -15,32 +13,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final confirmController = TextEditingController();
 
   bool loading = false;
-  bool sessionReady = false; // 👈 controla se o code foi trocado
-
-  @override
-  void initState() {
-    super.initState();
-    _exchangeCode(); // 👈 troca o code por sessão ao abrir a página
-  }
-
-  Future<void> _exchangeCode() async {
-    final code = widget.code;
-    if (code == null || code.isEmpty) {
-      debugPrint('Nenhum code recebido');
-      return;
-    }
-
-    try {
-      await Supabase.instance.client.auth.exchangeCodeForSession(code);
-      setState(() => sessionReady = true);
-    } catch (e) {
-      debugPrint('Erro ao trocar code: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link inválido ou expirado.')),
-      );
-    }
-  }
 
   Future<void> updatePassword() async {
     if (passwordController.text != confirmController.text) {
@@ -60,9 +32,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     setState(() => loading = true);
 
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: passwordController.text),
-      );
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Usuário não autenticado.');
+
+      await user.updatePassword(passwordController.text);
 
       if (!mounted) return;
 
@@ -70,7 +43,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         const SnackBar(content: Text('Senha alterada com sucesso!')),
       );
 
-      // 👇 vai para login e limpa a pilha de navegação
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
     } catch (e) {
       debugPrint('Erro ao atualizar senha: $e');
@@ -98,17 +70,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // 👇 avisa se o code ainda está sendo processado
-            if (!sessionReady)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: LinearProgressIndicator(),
-              ),
-
             TextField(
               controller: passwordController,
               obscureText: true,
-              enabled: sessionReady, // 👈 desabilita até a sessão estar pronta
               decoration: const InputDecoration(labelText: 'Nova senha'),
             ),
 
@@ -117,14 +81,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             TextField(
               controller: confirmController,
               obscureText: true,
-              enabled: sessionReady,
               decoration: const InputDecoration(labelText: 'Confirmar senha'),
             ),
 
             const SizedBox(height: 24),
 
             ElevatedButton(
-              onPressed: (loading || !sessionReady) ? null : updatePassword,
+              onPressed: loading ? null : updatePassword,
               child: loading
                   ? const SizedBox(
                       width: 20,

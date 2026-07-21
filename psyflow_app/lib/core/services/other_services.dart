@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+import '../../models/intervention_template.dart';
 
 // ─── JourneyService ───────────────────────────────────────────────────────────
 
@@ -90,8 +92,6 @@ class EmotionalLogService {
 
 // ─── InterventionService ──────────────────────────────────────────────────────
 
-import '../../models/intervention_template.dart';
-
 class InterventionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -170,7 +170,7 @@ class PasswordResetService {
 
   // Fluxo customizado (mantém código de 6 dígitos):
   Future<String> createCode(String email) async {
-    final rnd = Random();
+    final rnd = Random.secure();
     final code = (100000 + rnd.nextInt(900000)).toString();
 
     await _db.collection('password_reset_codes').add({

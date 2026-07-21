@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_theme.dart';
 
 class ChangePasswordPage extends StatefulWidget {
@@ -44,29 +44,28 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     setState(() => _loading = true);
 
     try {
-      // Reautentica com a senha atual para validar
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
       if (user?.email == null) throw Exception('Usuário não encontrado.');
 
-      await Supabase.instance.client.auth.signInWithPassword(
+      // Re-autentica com a senha atual
+      final cred = EmailAuthProvider.credential(
         email: user!.email!,
         password: _currentController.text.trim(),
       );
+      await user.reauthenticateWithCredential(cred);
 
       // Atualiza para a nova senha
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: _newController.text.trim()),
-      );
+      await user.updatePassword(_newController.text.trim());
 
       if (mounted) {
         _showSnack('Senha alterada com sucesso!');
         Navigator.pop(context);
       }
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (mounted) {
-        final msg = e.message.contains('Invalid login')
+        final msg = e.code == 'wrong-password'
             ? 'Senha atual incorreta.'
-            : e.message;
+            : e.message ?? 'Erro ao alterar senha.';
         _showSnack(msg, error: true);
       }
     } catch (e) {

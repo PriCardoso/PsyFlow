@@ -1,7 +1,7 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProgressService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<void> registerProgress({
     required String patientId,
@@ -12,9 +12,7 @@ class ProgressService {
     String? feedback,
     String? taskId,
   }) async {
-    await supabase
-        .from('patient_intervention_progress')
-        .insert({
+    await _db.collection('patient_intervention_progress').add({
       'patient_id': patientId,
       'task_id': taskId,
       'intervention_code': interventionCode,
@@ -22,8 +20,7 @@ class ProgressService {
       'mood_before': moodBefore,
       'mood_after': moodAfter,
       'patient_feedback': feedback,
-      'completed_at':
-          DateTime.now().toIso8601String(),
+      'completed_at': FieldValue.serverTimestamp(),
     });
   }
 }

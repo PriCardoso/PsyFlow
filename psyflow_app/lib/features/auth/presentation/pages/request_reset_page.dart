@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'verify_code_page.dart';
 
@@ -38,16 +38,15 @@ class _RequestResetPageState extends State<RequestResetPage> {
     setState(() => _loading = true);
 
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        _emailController.text.trim(),
-        redirectTo: 'io.psyflow://reset-password',
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
       );
 
       if (mounted) {
         setState(() => _sent = true);
       }
-    } on AuthException catch (e) {
-      if (mounted) _showSnack(e.message, error: true);
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showSnack(e.message ?? 'Erro ao enviar email', error: true);
     } catch (_) {
       // Por segurança, não informamos se o email existe ou não
       if (mounted) setState(() => _sent = true);

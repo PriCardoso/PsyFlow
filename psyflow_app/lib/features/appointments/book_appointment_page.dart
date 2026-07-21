@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/appointment_service.dart';
 import '../../models/appointment_item.dart';
 import '../../models/psychologist_summary.dart';
 import '../../models/availability_slot.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BookAppointmentPage extends StatefulWidget {
   const BookAppointmentPage({super.key});
@@ -14,8 +15,7 @@ class BookAppointmentPage extends StatefulWidget {
 }
 
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
-  final _appointmentService =
-    AppointmentService(Supabase.instance.client);
+  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
   List<PsychologistSummary> _psychologists = [];
   List<AppointmentItem> _myAppointments = [];
   bool _loading = true;
@@ -30,8 +30,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final data = await _service.listAvailablePsychologists();
-      final appts = await _service.getMyAppointmentsAsPatient();
+      final data = await _appointmentService.listAvailablePsychologists();
+      final appts = await _appointmentService.getMyAppointmentsAsPatient();
       if (mounted) {
         setState(() {
           _psychologists = data.map((m) => PsychologistSummary.fromMap(m)).toList();
@@ -66,7 +66,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _SlotPickerSheet(psychologist: psychologist, service: _service),
+      builder: (_) => _SlotPickerSheet(psychologist: psychologist, service: _appointmentService),
     );
     if (booked == true) _load();
   }
@@ -94,7 +94,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
     if (confirm == true) {
       try {
-        await _service.cancelAppointment(appt.id);
+        await _appointmentService.cancelAppointment(appt.id);
         _load();
       } catch (e) {
         _showError(e.toString().replaceAll('Exception: ', ''));
@@ -340,12 +340,14 @@ class _SlotPickerSheetState extends State<_SlotPickerSheet> {
   Future<void> _confirmBooking() async {
     if (_selectedSlotId == null) return;
     final slot = _slots.firstWhere((s) => s.id == _selectedSlotId);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
     setState(() => _booking = true);
     try {
       await widget.service.bookAppointment(
         psychologistId: widget.psychologist.id,
-        patientId: Supabase.instance.client.auth.currentUser!.id,
+        patientId: user.uid,
         slot: slot,
         modality: slot.modality,
       );

@@ -1,7 +1,7 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EmotionalLogService {
-  final supabase = Supabase.instance.client;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<void> saveLog({
     required String patientId,
@@ -10,24 +10,25 @@ class EmotionalLogService {
     required int energy,
     String? notes,
   }) async {
-    await supabase.from('emotional_logs').insert({
+    await _db.collection('emotional_logs').add({
       'patient_id': patientId,
       'mood_score': mood,
       'anxiety_score': anxiety,
       'energy_score': energy,
       'notes': notes,
+      'created_at': FieldValue.serverTimestamp(),
     });
   }
 
   Future<List<Map<String, dynamic>>> getLogs(
     String patientId,
   ) async {
-    final result = await supabase
-        .from('emotional_logs')
-        .select()
-        .eq('patient_id', patientId)
-        .order('created_at');
+    final snap = await _db
+        .collection('emotional_logs')
+        .where('patient_id', isEqualTo: patientId)
+        .orderBy('created_at')
+        .get();
 
-    return List<Map<String, dynamic>>.from(result);
+    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 }
