@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
 import '../../core/services/user_service.dart';
 
@@ -16,7 +15,8 @@ class UserProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null;
-  bool get isPsychologist => _currentUser?.role == UserRole.psychologist;
+  bool get isPsychologist => _currentUser?.isProfessional ?? false;
+  bool get isProfessional => _currentUser?.isProfessional ?? false;
   bool get isPatient => _currentUser?.role == UserRole.patient;
 
   UserProvider() {
@@ -55,6 +55,7 @@ class UserProvider extends ChangeNotifier {
   Future<bool> completeProfile({
     required String role,
     required String fullName,
+    String? specialty,
     String? phone,
     String? crp,
     String? bio,

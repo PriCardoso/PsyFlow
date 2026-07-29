@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
-import '../../models/task_model.dart';
 import '../../models/task_item.dart';
 
 class TaskService {
@@ -80,7 +79,6 @@ class TaskService {
           .orderBy('due_date')
           .get();
 
-      // Enriquecer com nome do paciente via batch
       final tasks = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
       final patientIds = tasks.map((t) => t['patient_id'] as String).toSet();
 
@@ -88,7 +86,7 @@ class TaskService {
       for (final pid in patientIds) {
         final doc = await _db.collection('users').doc(pid).get();
         if (doc.exists) {
-          patientNames[pid] = doc.data()?['full_name'] ?? '';
+          patientNames[pid] = doc.data()?['full_name'] ?? doc.data()?['fullName'] ?? '';
         }
       }
 

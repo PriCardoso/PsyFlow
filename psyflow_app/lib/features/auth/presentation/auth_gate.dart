@@ -5,7 +5,6 @@ import '../../../core/services/user_service.dart';
 import 'pages/login_page.dart';
 import 'pages/complete_profile_page.dart';
 import '../../dashboard/pages/psychologist_dashboard_page.dart';
-import 'pages/reset_password_page.dart';
 import '../../dashboard/pages/patient_dashboard_page.dart';
 
 class AuthGate extends StatelessWidget {
@@ -112,9 +111,9 @@ class _ProfileFutureBuilderState extends State<_ProfileFutureBuilder> {
         }
 
         final role = profile['role'] as String?;
-        final fullName = profile['full_name'] as String?;
+        final fullName = profile['full_name'] as String? ?? profile['fullName'] as String?;
 
-        if (role == 'psychologist') {
+        if (role == 'psychologist' || role == 'professional') {
           return PsychologistDashboardPage(initialName: fullName);
         }
 

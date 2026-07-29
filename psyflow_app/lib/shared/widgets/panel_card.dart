@@ -90,7 +90,7 @@ class PanelEmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         children: [
-          Icon(icon, size: 36, color: AppColors.textSecondary.withValues(alpha: 0.4)),
+          Icon(icon, size: 36, color: AppColors.textSecondary.withAlpha(100)),
           const SizedBox(height: 10),
           Text(
             title,

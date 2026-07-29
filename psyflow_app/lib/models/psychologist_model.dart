@@ -1,12 +1,6 @@
 import 'user_model.dart';
 
 class PsychologistModel extends UserModel {
-  final String crp;
-
-  final String? specialty;
-
-  final String? bio;
-
   final String? clinic;
 
   const PsychologistModel({
@@ -15,12 +9,13 @@ class PsychologistModel extends UserModel {
     required super.fullName,
     required super.createdAt,
     required super.role,
-    required this.crp,
+    super.crp,
+    super.professionalRegistration,
+    super.specialty,
     super.phone,
     super.photoUrl,
     super.active,
-    this.specialty,
-    this.bio,
+    super.bio,
     this.clinic,
   });
 }
