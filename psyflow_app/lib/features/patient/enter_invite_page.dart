@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/di/service_locator.dart';
 
 class EnterInvitePage extends StatefulWidget {
   const EnterInvitePage({super.key});
@@ -11,7 +12,7 @@ class EnterInvitePage extends StatefulWidget {
 
 class _EnterInvitePageState extends State<EnterInvitePage> {
   final codeController = TextEditingController();
-  final _inviteService = InviteService();
+  final _inviteService = sl<InviteService>();
   bool loading = false;
   Map<String, dynamic>? linkedPsychologist;
 

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
 import '../../../core/services/invite_service.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
@@ -22,8 +23,8 @@ class PsychologistDashboardPage extends StatefulWidget {
 }
 
 class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
-  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
-  final _inviteService = InviteService();
+  final _appointmentService = sl<AppointmentService>();
+  final _inviteService = sl<InviteService>();
 
   String? userName;
   String? userEmail;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/patient_link_model.dart';
 
 class InvitePage extends StatefulWidget {
@@ -12,7 +13,7 @@ class InvitePage extends StatefulWidget {
 }
 
 class _InvitePageState extends State<InvitePage> {
-  final _inviteService = InviteService();
+  final _inviteService = sl<InviteService>();
   String? generatedCode;
   bool generating = false;
   List<Map<String, dynamic>> invites = [];

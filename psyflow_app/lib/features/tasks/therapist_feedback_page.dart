@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
 
 class TherapistFeedbackPage extends StatefulWidget {
@@ -14,7 +15,7 @@ class TherapistFeedbackPage extends StatefulWidget {
 
 class _TherapistFeedbackPageState extends State<TherapistFeedbackPage> {
   final _notesController = TextEditingController();
-  final _taskService = TaskService();
+  final _taskService = sl<TaskService>();
   bool _saving = false;
 
   @override

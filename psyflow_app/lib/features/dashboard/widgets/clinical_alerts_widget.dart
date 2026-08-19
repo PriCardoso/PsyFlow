@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/mood_service.dart';
 import '../../../core/services/task_service.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../models/mood_model.dart';
 import '../../../models/task_item.dart';
 
@@ -36,8 +37,8 @@ class ClinicalAlertsWidget extends StatefulWidget {
 }
 
 class _ClinicalAlertsWidgetState extends State<ClinicalAlertsWidget> {
-  final _moodService = MoodService();
-  final _taskService = TaskService();
+  final _moodService = sl<MoodService>();
+  final _taskService = sl<TaskService>();
 
   List<ClinicalAlert> _alerts = [];
   bool _loading = true;

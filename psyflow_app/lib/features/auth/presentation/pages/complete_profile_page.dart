@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/user_service.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../dashboard/pages/psychologist_dashboard_page.dart';
 import '../../../dashboard/pages/patient_dashboard_page.dart';
 
@@ -29,7 +30,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
     setState(() => loading = true);
 
     try {
-      await UserService().saveProfile(
+      await sl<UserService>().saveProfile(
         role: widget.role,
         fullName: fullNameController.text.trim(),
         phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),

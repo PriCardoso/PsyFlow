@@ -161,34 +161,144 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                     const _SectionLabel(text: 'Minhas consultas'),
                     const SizedBox(height: 10),
                     ...upcoming.map((a) => Container(
-                          margin: const EdgeInsets.only(bottom: 10),
+                          margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.08),
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.event_available_rounded, color: AppColors.success, size: 22),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(a.otherPartyName ?? 'Psicólogo', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                                    Text(_formatDateTime(a.startTime), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  ],
-                                ),
+                            border: Border.all(
+                              color: AppColors.patient.withValues(alpha: 0.25),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                              TextButton(
-                                onPressed: () => _cancelAppointment(a),
-                                child: const Text('Cancelar', style: TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [AppColors.patient, AppColors.accentLight],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.medical_services_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          a.otherPartyName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        if (a.psychologistCrp != null && a.psychologistCrp!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 2),
+                                            child: Text(
+                                              'CRP: ${a.psychologistCrp}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'Confirmada',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.success,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(height: 1),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.schedule_rounded,
+                                    size: 16,
+                                    color: AppColors.patient,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _formatDateTime(a.startTime),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.background,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      a.modality == 'online' ? 'Online 🌐' : 'Presencial 🏢',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  InkWell(
+                                    onTap: () => _cancelAppointment(a),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      child: Text(
+                                        'Cancelar',
+                                        style: TextStyle(
+                                          color: AppColors.error,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         )),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                   ],
 
                   // ── Busca ──────────────────────────────────────
@@ -337,7 +447,10 @@ class _SlotPickerSheetState extends State<_SlotPickerSheet> {
     setState(() => _loading = true);
     try {
       final slots = await widget.service.getAvailableSlotsForPsychologist(widget.psychologist.id);
-      if (mounted) setState(() => _slots = slots);
+      final now = DateTime.now();
+      final validSlots = slots.where((s) => !s.isBooked && s.startTime.isAfter(now)).toList()
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      if (mounted) setState(() => _slots = validSlots);
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }
@@ -352,7 +465,10 @@ class _SlotPickerSheetState extends State<_SlotPickerSheet> {
     try {
       await widget.service.bookAppointment(
         psychologistId: widget.psychologist.id,
+        psychologistName: widget.psychologist.fullName,
+        psychologistCrp: widget.psychologist.crp,
         patientId: user.uid,
+        patientName: user.displayName ?? user.email,
         slot: slot,
         modality: slot.modality,
       );

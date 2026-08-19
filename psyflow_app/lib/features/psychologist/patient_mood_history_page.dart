@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/mood_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/mood_model.dart';
 
 class PatientMoodHistoryPage extends StatefulWidget {
@@ -18,7 +19,7 @@ class PatientMoodHistoryPage extends StatefulWidget {
 }
 
 class _PatientMoodHistoryPageState extends State<PatientMoodHistoryPage> {
-  final _moodService = MoodService();
+  final _moodService = sl<MoodService>();
   List<MoodEntry> _entries = [];
   bool _loading = true;
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
 
 class TaskDetailsPage extends StatefulWidget {
@@ -14,7 +15,7 @@ class TaskDetailsPage extends StatefulWidget {
 
 class _TaskDetailsPageState extends State<TaskDetailsPage> {
   final _feedbackController = TextEditingController();
-  final _taskService = TaskService();
+  final _taskService = sl<TaskService>();
 
   double _moodBefore = 5;
   double _moodAfter = 5;

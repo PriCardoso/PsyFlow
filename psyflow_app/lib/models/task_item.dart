@@ -40,29 +40,31 @@ class TaskItem {
   });
 
   factory TaskItem.fromMap(Map<String, dynamic> map) {
+    DateTime? parseNullableDate(dynamic val) {
+      if (val == null) return null;
+      if (val is Timestamp) return val.toDate();
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val);
+      return null;
+    }
+
     return TaskItem(
-      id: map['id'] as String,
-      patientId: map['patient_id'] as String,
-      psychologistId: map['psychologist_id'] as String,
-      title: map['title'] as String,
+      id: (map['id'] ?? '') as String,
+      patientId: (map['patient_id'] ?? '') as String,
+      psychologistId: (map['psychologist_id'] ?? '') as String,
+      title: (map['title'] ?? '') as String,
       description: map['description'] as String?,
       category: map['category'] as String? ?? 'geral',
       protocol: map['protocol'] as String? ?? '',
-      difficultyLevel: map['difficulty_level'] as int? ?? 1,
+      difficultyLevel: (map['difficulty_level'] as num?)?.toInt() ?? 1,
       status: map['status'] as String? ?? 'pending',
-      dueDate: map['due_date'] != null 
-          ? (map['due_date'] as Timestamp).toDate() 
-          : null,
-      createdAt: map['created_at'] != null 
-          ? (map['created_at'] as Timestamp).toDate() 
-          : null,
-      completedAt: map['completed_at'] != null 
-          ? (map['completed_at'] as Timestamp).toDate() 
-          : null,
+      dueDate: parseNullableDate(map['due_date']),
+      createdAt: parseNullableDate(map['created_at']),
+      completedAt: parseNullableDate(map['completed_at']),
       patientResponse: map['patient_response'] as String?,
       therapistNotes: map['therapist_notes'] as String?,
-      moodBefore: map['mood_before'] as int?,
-      moodAfter: map['mood_after'] as int?,
+      moodBefore: (map['mood_before'] as num?)?.toInt(),
+      moodAfter: (map['mood_after'] as num?)?.toInt(),
       patientName: map['patient_name'] as String?,
     );
   }

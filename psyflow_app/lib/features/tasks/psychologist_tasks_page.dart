@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
 import '../../models/patient_link_model.dart';
 
@@ -13,8 +14,8 @@ class PsychologistTasksPage extends StatefulWidget {
 }
 
 class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
-  final _taskService = TaskService();
-  final _inviteService = InviteService();
+  final _taskService = sl<TaskService>();
+  final _inviteService = sl<InviteService>();
 
   List<TaskItem> _tasks = [];
   List<PatientLink> _patients = [];

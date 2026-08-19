@@ -1,1 +1,27 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"psyflow-613bf","appId":"1:205076184054:android:4507fad20576644b7925d7","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"psyflow-613bf","configurations":{"android":"1:205076184054:android:4507fad20576644b7925d7","ios":"1:205076184054:ios:5336107465f3d9a37925d7","web":"1:205076184054:web:6e5d5d501d17fee87925d7"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "psyflow-613bf",
+          "appId": "1:205076184054:android:4507fad20576644b7925d7",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "psyflow-613bf",
+          "configurations": {
+            "android": "1:205076184054:android:4507fad20576644b7925d7",
+            "ios": "1:205076184054:ios:5336107465f3d9a37925d7",
+            "web": "1:205076184054:web:6e5d5d501d17fee87925d7"
+          }
+        }
+      }
+    }
+  }
+}

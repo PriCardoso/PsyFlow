@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/patient_link_model.dart';
 import 'patient_profile_page.dart';
 
@@ -13,7 +14,7 @@ class PatientsPage extends StatefulWidget {
 
 class _PatientsPageState extends State<PatientsPage>
     with SingleTickerProviderStateMixin {
-  final _service = InviteService();
+  final _service = sl<InviteService>();
   late TabController _tabController;
 
   List<PatientLink> _all = [];

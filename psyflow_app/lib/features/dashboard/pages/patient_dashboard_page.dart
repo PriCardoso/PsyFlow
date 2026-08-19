@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
 import '../../patient/enter_invite_page.dart';
+import '../../patient/espaco_psyflow_page.dart';
 import '../../tasks/patient_tasks_page.dart';
 import '../../mood/mood_page.dart';
 import '../../appointments/book_appointment_page.dart';
@@ -77,6 +78,11 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             label: 'Início',
             icon: Icons.home_rounded,
             onTap: () {},
+          ),
+          DrawerMenuItem(
+            label: 'Espaço PsyFlow',
+            icon: Icons.auto_awesome_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EspacoPsyFlowPage())),
           ),
           DrawerMenuItem(
             label: 'Minhas consultas',
@@ -338,38 +344,148 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Espaço PsyFlow (estilo "Espaço Telavita") ──
+                    // ── Espaço PsyFlow (Interativo e Dedicado) ──
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFE7ECF1)),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                        ),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  '✨ Espaço Terapêutico',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           const Text(
                             'Espaço PsyFlow',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.4,
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          Container(
-                            height: 90,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [AppColors.patient.withValues(alpha: 0.15), AppColors.accentLight.withValues(alpha: 0.1)],
+                          const SizedBox(height: 6),
+                          Text(
+                            'Pratique exercícios guiados por tema: Foco, Ansiedade, TCC e Ativação.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withValues(alpha: 0.9),
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Atalhos de Temas rápidos
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _ThemeChip(
+                                label: '🎯 Foco & TDAH',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const EspacoPsyFlowPage(initialCategory: 'foco_concentracao'),
+                                  ),
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Center(
-                              child: Text('💜', style: TextStyle(fontSize: 32)),
-                            ),
+                              _ThemeChip(
+                                label: '🧘 Ansiedade',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const EspacoPsyFlowPage(initialCategory: 'ansiedade'),
+                                  ),
+                                ),
+                              ),
+                              _ThemeChip(
+                                label: '🧠 TCC',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const EspacoPsyFlowPage(initialCategory: 'tcc'),
+                                  ),
+                                ),
+                              ),
+                              _ThemeChip(
+                                label: '☀️ Ativação',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const EspacoPsyFlowPage(initialCategory: 'depressao'),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Seu espaço seguro para acompanhar sua jornada de bem-estar, com ferramentas e acompanhamento contínuo.',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                          const SizedBox(height: 18),
+
+                          // Botão Principal
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF4F46E5),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const EspacoPsyFlowPage(),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Acessar Todas as Atividades',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Icon(Icons.arrow_forward_rounded, size: 16),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -384,3 +500,35 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     );
   }
 }
+
+class _ThemeChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _ThemeChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+

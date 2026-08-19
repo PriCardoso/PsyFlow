@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/auth_error_translator.dart';
+import '../auth_gate.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
 
@@ -29,7 +30,14 @@ class _LoginPageState extends State<LoginPage> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-      // AuthGate in main.dart handles navigation after login
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (_) => false,
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         _showError(AuthErrorTranslator.translate(e));

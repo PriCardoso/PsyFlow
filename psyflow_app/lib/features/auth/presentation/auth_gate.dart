@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/user_service.dart';
+import '../../../core/di/service_locator.dart';
 import 'pages/login_page.dart';
 import 'pages/complete_profile_page.dart';
 import '../../dashboard/pages/psychologist_dashboard_page.dart';
@@ -61,7 +62,7 @@ class _ProfileFutureBuilderState extends State<_ProfileFutureBuilder> {
   void _updateProfileFuture() {
     if (widget.user.uid != _lastUserId) {
       _lastUserId = widget.user.uid;
-      _profileFuture = UserService().getProfile();
+      _profileFuture = sl<UserService>().getProfile();
     }
   }
 

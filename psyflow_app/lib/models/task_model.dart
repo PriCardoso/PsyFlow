@@ -64,28 +64,31 @@ class TaskModel {
   factory TaskModel.fromMap(
       String id,
       Map<String, dynamic> map) {
+    DateTime? parseNullableDate(dynamic val) {
+      if (val == null) return null;
+      if (val is Timestamp) return val.toDate();
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val);
+      return null;
+    }
+
     return TaskModel(
       id: id,
-      patientId: map["patientId"],
-      psychologistId: map["psychologistId"],
-      title: map["title"],
-      description: map["description"],
-      category: map["category"],
-      protocol: map["protocol"],
-      difficulty: map["difficulty"],
-      status: map["status"],
-      createdAt:
-          (map["createdAt"] as Timestamp).toDate(),
-      completedAt: map["completedAt"] != null
-          ? (map["completedAt"] as Timestamp).toDate()
-          : null,
-      dueDate: map["dueDate"] != null
-          ? (map["dueDate"] as Timestamp).toDate()
-          : null,
-      response: map["response"],
-      moodBefore: map["moodBefore"],
-      moodAfter: map["moodAfter"],
-      therapistNotes: map["therapistNotes"],
+      patientId: map["patientId"] ?? map["patient_id"] ?? "",
+      psychologistId: map["psychologistId"] ?? map["psychologist_id"] ?? "",
+      title: map["title"] ?? "",
+      description: map["description"] ?? "",
+      category: map["category"] ?? "geral",
+      protocol: map["protocol"] ?? "",
+      difficulty: (map["difficulty"] as num?)?.toInt() ?? 1,
+      status: map["status"] ?? "pending",
+      createdAt: parseNullableDate(map["createdAt"] ?? map["created_at"]) ?? DateTime.now(),
+      completedAt: parseNullableDate(map["completedAt"] ?? map["completed_at"]),
+      dueDate: parseNullableDate(map["dueDate"] ?? map["due_date"]),
+      response: map["response"] ?? map["patient_response"],
+      moodBefore: (map["moodBefore"] ?? map["mood_before"] as num?)?.toInt(),
+      moodAfter: (map["moodAfter"] ?? map["mood_after"] as num?)?.toInt(),
+      therapistNotes: map["therapistNotes"] ?? map["therapist_notes"],
     );
   }
 

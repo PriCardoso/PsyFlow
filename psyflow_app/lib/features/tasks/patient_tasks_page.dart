@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
 
 class PatientTasksPage extends StatefulWidget {
@@ -11,7 +12,7 @@ class PatientTasksPage extends StatefulWidget {
 }
 
 class _PatientTasksPageState extends State<PatientTasksPage> {
-  final _taskService = TaskService();
+  final _taskService = sl<TaskService>();
   List<TaskItem> _tasks = [];
   bool _loading = true;
 

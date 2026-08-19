@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/user_service.dart';
-import '../pages/login_page.dart';
+import '../../../../core/di/service_locator.dart';
+import '../auth_gate.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -32,7 +33,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _loadProfile() async {
-    final data = await UserService().getProfile();
+    final data = await sl<UserService>().getProfile();
     if (data != null && mounted) {
       setState(() {
         role = data['role'];
@@ -51,7 +52,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => saving = true);
 
     try {
-      await UserService().saveProfile(
+      await sl<UserService>().saveProfile(
         role: role!,
         fullName: fullNameController.text.trim(),
         phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
@@ -102,7 +103,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
+          MaterialPageRoute(builder: (_) => const AuthGate()),
           (_) => false,
         );
       }

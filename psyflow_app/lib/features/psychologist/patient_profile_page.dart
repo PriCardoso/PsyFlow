@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/patient_link_model.dart';
 import '../mood/patient_mood_history_page.dart';
 import '../tasks/psychologist_tasks_page.dart';
@@ -20,7 +21,7 @@ class PatientProfilePage extends StatefulWidget {
 }
 
 class _PatientProfilePageState extends State<PatientProfilePage> {
-  final _service = InviteService();
+  final _service = sl<InviteService>();
   bool _loading = false;
   late bool _isActive;
 

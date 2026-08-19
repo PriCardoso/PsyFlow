@@ -23,6 +23,16 @@ class PsychologistSummary {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'full_name': fullName,
+      'modality': modality,
+      'crp': crp,
+      'bio': bio,
+    };
+  }
+
   String get initials {
     final parts = fullName.trim().split(' ');
     if (parts.length == 1) return parts[0][0].toUpperCase();

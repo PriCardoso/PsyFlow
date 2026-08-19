@@ -43,13 +43,16 @@ service cloud.firestore {
       allow read: if request.auth.uid == resource.data.patient_id
                   || request.auth.uid == resource.data.psychologist_id;
       allow create: if request.auth != null;
+      allow update: if request.auth.uid == resource.data.patient_id
+                  || request.auth.uid == resource.data.psychologist_id;
     }
 
-    // availability_slots — psicólogo gerencia os próprios
+    // availability_slots — psicólogo gerencia os próprios; paciente pode reservar
     match /availability_slots/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.uid == resource.data.psychologist_id
-                   || request.auth.uid == request.resource.data.psychologist_id;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth.uid == resource.data.psychologist_id;
     }
 
     // Coleções de leitura pública autenticada
