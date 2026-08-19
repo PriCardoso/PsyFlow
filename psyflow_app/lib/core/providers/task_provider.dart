@@ -1,104 +1,108 @@
-import 'package:flutter/material.dart';
-import 'dart:async';
-import '../../models/task_item.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/services/task_service.dart';
+import '../../core/errors/app_exception.dart';
+import '../../models/task_item.dart';
 
 class TaskProvider extends ChangeNotifier {
-  final TaskService _taskService = TaskService();
+  final TaskService _taskService = sl<TaskService>();
+  final FirebaseAuth _auth = sl<FirebaseAuth>();
 
   List<TaskItem> _tasks = [];
   bool _isLoading = false;
   String? _error;
-  StreamSubscription? _tasksSubscription;
 
   List<TaskItem> get tasks => _tasks;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  List<TaskItem> get pendingTasks {
-    return _tasks
-        .where((t) => t.status == 'pending')
-        .toList()
-      ..sort((a, b) {
-        if (a.dueDate == null && b.dueDate == null) return 0;
-        if (a.dueDate == null) return 1;
-        if (b.dueDate == null) return -1;
-        return a.dueDate!.compareTo(b.dueDate!);
-      });
-  }
+  Future<void> loadMyTasks() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      _tasks = [];
+      notifyListeners();
+      return;
+    }
 
-  List<TaskItem> get completedTasks {
-    return _tasks
-        .where((t) => t.isCompleted)
-        .toList()
-      ..sort((a, b) {
-        if (a.completedAt == null && b.completedAt == null) return 0;
-        if (a.completedAt == null) return 1;
-        if (b.completedAt == null) return -1;
-        return b.completedAt!.compareTo(a.completedAt!);
-      });
-  }
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
-  List<TaskItem> get overdueTasks {
-    final now = DateTime.now();
-    return _tasks
-        .where((t) => !t.isCompleted && t.dueDate != null && t.dueDate!.isBefore(now))
-        .toList();
+    try {
+      _tasks = await _taskService.getMyTasks();
+      _error = null;
+    } catch (e) {
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      debugPrint('TaskProvider.loadMyTasks error: $appException');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> loadTasksForPatient(String patientId) async {
-    _cancelSubscription();
+    final user = _auth.currentUser;
+    if (user == null) {
+      _tasks = [];
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _tasksSubscription = _taskService.tasksStreamForPatient(patientId).listen(
-        (tasks) {
-          _tasks = tasks;
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          _error = 'Erro ao carregar tarefas: $e';
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
+      _tasks = await _taskService.getTasksForPatient(patientId);
+      _error = null;
     } catch (e) {
-      _error = 'Erro ao iniciar listener: $e';
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      debugPrint('TaskProvider.loadTasksForPatient error: $appException');
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> loadTasksForPsychologist(String psychologistId) async {
-    _cancelSubscription();
+  Future<void> loadTasksCreatedByMe() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      _tasks = [];
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _tasksSubscription = _taskService.tasksStreamForPsychologist(psychologistId).listen(
-        (tasks) {
-          _tasks = tasks;
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          _error = 'Erro ao carregar tarefas: $e';
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
+      _tasks = await _taskService.getTasksCreatedByMe();
+      _error = null;
     } catch (e) {
-      _error = 'Erro ao iniciar listener: $e';
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      debugPrint('TaskProvider.loadTasksCreatedByMe error: $appException');
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<bool> createTask({
+  Stream<List<TaskItem>> getMyTasksStream() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+    return _taskService.tasksStreamForPatient(user.uid);
+  }
+
+  Stream<List<TaskItem>> getTasksStreamForPsychologist(String psychologistId) {
+    return _taskService.tasksStreamForPsychologist(psychologistId);
+  }
+
+  Future<void> createTask({
     required String patientId,
     required String title,
     String? description,
@@ -117,15 +121,15 @@ class TaskProvider extends ChangeNotifier {
         difficultyLevel: difficultyLevel,
         dueDate: dueDate,
       );
-      return true;
+      await loadTasksCreatedByMe();
     } catch (e) {
-      _error = 'Erro ao criar tarefa: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     }
   }
 
-  Future<bool> completeTask({
+  Future<void> completeTask({
     required String taskId,
     required String response,
     required int moodBefore,
@@ -138,63 +142,51 @@ class TaskProvider extends ChangeNotifier {
         moodBefore: moodBefore,
         moodAfter: moodAfter,
       );
-      return true;
+      await loadMyTasks();
     } catch (e) {
-      _error = 'Erro ao concluir tarefa: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     }
   }
 
-  Future<bool> toggleTaskStatus(String taskId, bool completed) async {
+  Future<void> toggleTaskStatus(String taskId, bool completed) async {
     try {
       await _taskService.toggleTaskStatus(taskId, completed);
-      return true;
+      await loadMyTasks();
     } catch (e) {
-      _error = 'Erro ao atualizar tarefa: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     }
   }
 
-  Future<bool> deleteTask(String taskId) async {
+  Future<void> deleteTask(String taskId) async {
     try {
       await _taskService.deleteTask(taskId);
-      return true;
+      await loadTasksCreatedByMe();
     } catch (e) {
-      _error = 'Erro ao excluir tarefa: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     }
   }
 
-  Future<bool> saveTherapistNotes({
+  Future<void> saveTherapistNotes({
     required String taskId,
     required String notes,
   }) async {
     try {
       await _taskService.saveTherapistNotes(taskId: taskId, notes: notes);
-      return true;
     } catch (e) {
-      _error = 'Erro ao salvar anotação: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     }
-  }
-
-  void _cancelSubscription() {
-    _tasksSubscription?.cancel();
-    _tasksSubscription = null;
   }
 
   void clearError() {
     _error = null;
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _cancelSubscription();
-    super.dispose();
   }
 }

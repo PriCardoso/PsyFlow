@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/chat_message_model.dart';
+import '../../core/errors/app_exception.dart';
 
 abstract class ChatRepository {
   Stream<List<ChatMessageModel>> getMessages(String chatId);
@@ -13,8 +14,8 @@ abstract class ChatRepository {
 class FirestoreChatRepository implements ChatRepository {
   final FirebaseFirestore _db;
 
-  FirestoreChatRepository({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  FirestoreChatRepository({required FirebaseFirestore firestore})
+      : _db = firestore;
 
   String _getChatId(String userId1, String userId2) {
     final ids = [userId1, userId2]..sort();
@@ -31,56 +32,67 @@ class FirestoreChatRepository implements ChatRepository {
         .limit(100)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => ChatMessageModel.fromMap({'id': doc.id, ...doc.data()}))
+            .map((doc) {
+              final data = {'id': doc.id, ...doc.data()};
+              return ChatMessageModel.fromMap(data, data['id'] as String);
+            })
             .toList()
           ..sort((a, b) => a.timestamp.compareTo(b.timestamp)));
   }
 
   @override
   Future<void> sendMessage(ChatMessageModel message) async {
-    final chatId = _getChatId(message.senderId, message.receiverId);
-    final batch = _db.batch();
+    try {
+      final chatId = _getChatId(message.senderId, message.receiverId);
+      final batch = _db.batch();
 
-    final messageRef = _db
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .doc();
+      final messageRef = _db
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc();
 
-    batch.set(messageRef, message.toMap());
+      batch.set(messageRef, message.toMap());
 
-    final chatRef = _db.collection('chats').doc(chatId);
-    batch.set(chatRef, {
-      'participants': [message.senderId, message.receiverId],
-      'lastMessage': message.content,
-      'lastMessageTime': Timestamp.fromDate(message.timestamp),
-      'lastMessageType': message.type.name,
-      'unreadCount_${message.receiverId}': FieldValue.increment(1),
-    }, SetOptions(merge: true));
+      final chatRef = _db.collection('chats').doc(chatId);
+      batch.set(chatRef, {
+        'participants': [message.senderId, message.receiverId],
+        'lastMessage': message.content,
+        'lastMessageTime': Timestamp.fromDate(message.timestamp),
+        'lastMessageType': message.type.name,
+        'unreadCount_${message.receiverId}': FieldValue.increment(1),
+      }, SetOptions(merge: true));
 
-    await batch.commit();
+      await batch.commit();
+    } catch (e) {
+      throw AppException('Erro ao enviar mensagem: $e', originalError: e);
+    }
   }
 
   @override
   Future<void> markAsRead(String chatId, String userId) async {
-    final chatRef = _db.collection('chats').doc(chatId);
-    await chatRef.update({
-      'unreadCount_$userId': 0,
-    });
+    try {
+      final chatRef = _db.collection('chats').doc(chatId);
+      await chatRef.update({
+        'unreadCount_$userId': 0,
+      });
 
-    final messagesQuery = await _db
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .where('receiverId', isEqualTo: userId)
-        .where('read', isEqualTo: false)
-        .get();
+      final messagesQuery = await _db
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: userId)
+          .where('read', isEqualTo: false)
+          .get();
 
-    final batch = _db.batch();
-    for (final doc in messagesQuery.docs) {
-      batch.update(doc.reference, {'read': true});
+      final batch = _db.batch();
+      for (final doc in messagesQuery.docs) {
+        batch.update(doc.reference, {'read': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw AppException('Erro ao marcar como lida: $e', originalError: e);
     }
-    await batch.commit();
   }
 
   @override
@@ -90,12 +102,16 @@ class FirestoreChatRepository implements ChatRepository {
 
   @override
   Future<void> deleteMessage(String chatId, String messageId) async {
-    await _db
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .doc(messageId)
-        .delete();
+    try {
+      await _db
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .delete();
+    } catch (e) {
+      throw AppException('Erro ao excluir mensagem: $e', originalError: e);
+    }
   }
 
   @override

@@ -1,31 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:psyflow_app/models/therapeutic_protocol.dart';
-import 'package:psyflow_app/models/intervention_template.dart';
+import '../../../models/therapeutic_protocol.dart';
+import '../../../models/intervention_template.dart';
+import '../../core/errors/app_exception.dart';
 
 class ProtocolService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+
+  ProtocolService({required FirebaseFirestore firestore}) : _db = firestore;
 
   /// Get all active protocols
   Future<List<TherapeuticProtocol>> getActiveProtocols({String? specialty}) async {
-    Query query = _db.collection('therapeutic_protocols').where('is_active', isEqualTo: true);
-    if (specialty != null) {
-      query = query.where('specialty', isEqualTo: specialty);
+    try {
+      Query query = _db.collection('therapeutic_protocols').where('is_active', isEqualTo: true);
+      if (specialty != null) {
+        query = query.where('specialty', isEqualTo: specialty);
+      }
+      final snapshot = await query.orderBy('name').get();
+      return snapshot.docs.map((doc) => TherapeuticProtocol.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+    } catch (e) {
+      throw AppException('Erro ao buscar protocolos: $e', originalError: e);
     }
-    final snapshot = await query.orderBy('name').get();
-    return snapshot.docs.map((doc) => TherapeuticProtocol.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
   }
 
   /// Get protocol by ID
   Future<TherapeuticProtocol?> getProtocolById(String protocolId) async {
-    final doc = await _db.collection('therapeutic_protocols').doc(protocolId).get();
-    if (!doc.exists) return null;
-    return TherapeuticProtocol.fromMap(doc.data()!, doc.id);
+    try {
+      final doc = await _db.collection('therapeutic_protocols').doc(protocolId).get();
+      if (!doc.exists) return null;
+      return TherapeuticProtocol.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      throw AppException('Erro ao buscar protocolo: $e', originalError: e);
+    }
   }
 
   /// Create a new protocol
   Future<String> createProtocol(TherapeuticProtocol protocol) async {
-    final docRef = await _db.collection('therapeutic_protocols').add(protocol.toMap());
-    return docRef.id;
+    try {
+      final docRef = await _db.collection('therapeutic_protocols').add(protocol.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw AppException('Erro ao criar protocolo: $e', originalError: e);
+    }
   }
 
   /// Enroll patient in a protocol
@@ -34,57 +49,74 @@ class ProtocolService {
     required String patientId,
     required String professionalId,
   }) async {
-    final protocol = await getProtocolById(protocolId);
-    if (protocol == null) throw Exception('Protocolo não encontrado');
+    try {
+      final protocol = await getProtocolById(protocolId);
+      if (protocol == null) throw AppException('Protocolo não encontrado');
 
-    final stepProgress = protocol.steps.map((step) => StepProgress(
-      stepId: step.id,
-      stepOrder: step.order,
-      status: step.order == 1 ? StepStatus.available : StepStatus.locked,
-    )).toList();
+      final stepProgress = protocol.steps.map((step) => StepProgress(
+        stepId: step.id,
+        stepOrder: step.order,
+        status: step.order == 1 ? StepStatus.available : StepStatus.locked,
+      )).toList();
 
-    final enrollment = PatientProtocolEnrollment(
-      id: '',
-      protocolId: protocolId,
-      patientId: patientId,
-      professionalId: professionalId,
-      currentStepIndex: 0,
-      stepProgress: stepProgress,
-      startedAt: DateTime.now(),
-      status: EnrollmentStatus.active,
-    );
+      final enrollment = PatientProtocolEnrollment(
+        id: '',
+        protocolId: protocolId,
+        patientId: patientId,
+        professionalId: professionalId,
+        currentStepIndex: 0,
+        stepProgress: stepProgress,
+        startedAt: DateTime.now(),
+        status: EnrollmentStatus.active,
+      );
 
-    final docRef = await _db.collection('protocol_enrollments').add(enrollment.toMap());
-    return docRef.id;
+      final docRef = await _db.collection('protocol_enrollments').add(enrollment.toMap());
+      return docRef.id;
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException('Erro ao matricular paciente: $e', originalError: e);
+    }
   }
 
   /// Get patient's protocol enrollments
   Future<List<PatientProtocolEnrollment>> getPatientEnrollments(String patientId) async {
-    final snapshot = await _db
-        .collection('protocol_enrollments')
-        .where('patient_id', isEqualTo: patientId)
-        .orderBy('started_at', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('protocol_enrollments')
+          .where('patient_id', isEqualTo: patientId)
+          .orderBy('started_at', descending: true)
+          .get();
 
-    return snapshot.docs.map((doc) => PatientProtocolEnrollment.fromMap(doc.data(), doc.id)).toList();
+      return snapshot.docs.map((doc) => PatientProtocolEnrollment.fromMap(doc.data(), doc.id)).toList();
+    } catch (e) {
+      throw AppException('Erro ao buscar matrículas: $e', originalError: e);
+    }
   }
 
   /// Get professional's protocol enrollments
   Future<List<PatientProtocolEnrollment>> getProfessionalEnrollments(String professionalId) async {
-    final snapshot = await _db
-        .collection('protocol_enrollments')
-        .where('professional_id', isEqualTo: professionalId)
-        .orderBy('started_at', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('protocol_enrollments')
+          .where('professional_id', isEqualTo: professionalId)
+          .orderBy('started_at', descending: true)
+          .get();
 
-    return snapshot.docs.map((doc) => PatientProtocolEnrollment.fromMap(doc.data(), doc.id)).toList();
+      return snapshot.docs.map((doc) => PatientProtocolEnrollment.fromMap(doc.data(), doc.id)).toList();
+    } catch (e) {
+      throw AppException('Erro ao buscar matrículas: $e', originalError: e);
+    }
   }
 
   /// Get enrollment by ID
   Future<PatientProtocolEnrollment?> getEnrollmentById(String enrollmentId) async {
-    final doc = await _db.collection('protocol_enrollments').doc(enrollmentId).get();
-    if (!doc.exists) return null;
-    return PatientProtocolEnrollment.fromMap(doc.data()!, doc.id);
+    try {
+      final doc = await _db.collection('protocol_enrollments').doc(enrollmentId).get();
+      if (!doc.exists) return null;
+      return PatientProtocolEnrollment.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      throw AppException('Erro ao buscar matrícula: $e', originalError: e);
+    }
   }
 
   /// Update step progress
@@ -93,47 +125,52 @@ class ProtocolService {
     required int stepIndex,
     required StepProgress progress,
   }) async {
-    final enrollment = await getEnrollmentById(enrollmentId);
-    if (enrollment == null) throw Exception('Matrícula não encontrada');
+    try {
+      final enrollment = await getEnrollmentById(enrollmentId);
+      if (enrollment == null) throw AppException('Matrícula não encontrada');
 
-    final updatedProgress = List<StepProgress>.from(enrollment.stepProgress);
-    if (stepIndex >= 0 && stepIndex < updatedProgress.length) {
-      updatedProgress[stepIndex] = progress;
-    }
-
-    // Check if we should unlock next step
-    int newCurrentIndex = enrollment.currentStepIndex;
-    DateTime? nextUnlockAt;
-
-    if (progress.isCompleted && stepIndex < updatedProgress.length - 1) {
-      // Unlock next step
-      final nextStep = updatedProgress[stepIndex + 1];
-      if (nextStep.isLocked) {
-        updatedProgress[stepIndex + 1] = StepProgress(
-          stepId: nextStep.stepId,
-          stepOrder: nextStep.stepOrder,
-          status: StepStatus.available,
-          startedAt: DateTime.now(),
-        );
-        newCurrentIndex = stepIndex + 1;
+      final updatedProgress = List<StepProgress>.from(enrollment.stepProgress);
+      if (stepIndex >= 0 && stepIndex < updatedProgress.length) {
+        updatedProgress[stepIndex] = progress;
       }
-    }
 
-    // Check if protocol is completed
-    EnrollmentStatus newStatus = enrollment.status;
-    DateTime? completedAt;
-    if (updatedProgress.every((s) => s.isCompleted || s.isLocked)) {
-      newStatus = EnrollmentStatus.completed;
-      completedAt = DateTime.now();
-    }
+      // Check if we should unlock next step
+      int newCurrentIndex = enrollment.currentStepIndex;
+      DateTime? nextUnlockAt;
 
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'current_step_index': newCurrentIndex,
-      'step_progress': updatedProgress.map((s) => s.toMap()).toList(),
-      'status': newStatus.name,
-      'completed_at': completedAt != null ? Timestamp.fromDate(completedAt) : null,
-      'next_step_unlock_at': nextUnlockAt != null ? Timestamp.fromDate(nextUnlockAt) : null,
-    });
+      if (progress.isCompleted && stepIndex < updatedProgress.length - 1) {
+        // Unlock next step
+        final nextStep = updatedProgress[stepIndex + 1];
+        if (nextStep.isLocked) {
+          updatedProgress[stepIndex + 1] = StepProgress(
+            stepId: nextStep.stepId,
+            stepOrder: nextStep.stepOrder,
+            status: StepStatus.available,
+            startedAt: DateTime.now(),
+          );
+          newCurrentIndex = stepIndex + 1;
+        }
+      }
+
+      // Check if protocol is completed
+      EnrollmentStatus newStatus = enrollment.status;
+      DateTime? completedAt;
+      if (updatedProgress.every((s) => s.isCompleted || s.isLocked)) {
+        newStatus = EnrollmentStatus.completed;
+        completedAt = DateTime.now();
+      }
+
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'current_step_index': newCurrentIndex,
+        'step_progress': updatedProgress.map((s) => s.toMap()).toList(),
+        'status': newStatus.name,
+        'completed_at': completedAt != null ? Timestamp.fromDate(completedAt) : null,
+        'next_step_unlock_at': nextUnlockAt != null ? Timestamp.fromDate(nextUnlockAt) : null,
+      });
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException('Erro ao atualizar progresso: $e', originalError: e);
+    }
   }
 
   /// Record intervention completion in a step
@@ -143,54 +180,59 @@ class ProtocolService {
     required String interventionId,
     required Map<String, dynamic> result,
   }) async {
-    final enrollment = await getEnrollmentById(enrollmentId);
-    if (enrollment == null) throw Exception('Matrícula não encontrada');
+    try {
+      final enrollment = await getEnrollmentById(enrollmentId);
+      if (enrollment == null) throw AppException('Matrícula não encontrada');
 
-    final updatedProgress = List<StepProgress>.from(enrollment.stepProgress);
-    if (stepIndex >= 0 && stepIndex < updatedProgress.length) {
-      final step = updatedProgress[stepIndex];
-      final newResults = Map<String, dynamic>.from(step.interventionResults);
-      newResults[interventionId] = {
-        ...result,
-        'completed_at': FieldValue.serverTimestamp(),
-      };
+      final updatedProgress = List<StepProgress>.from(enrollment.stepProgress);
+      if (stepIndex >= 0 && stepIndex < updatedProgress.length) {
+        final step = updatedProgress[stepIndex];
+        final newResults = Map<String, dynamic>.from(step.interventionResults);
+        newResults[interventionId] = {
+          ...result,
+          'completed_at': FieldValue.serverTimestamp(),
+        };
 
-      // Calculate completion percent based on interventions in this step
-      final protocol = await getProtocolById(enrollment.protocolId);
-      if (protocol != null && stepIndex < protocol.steps.length) {
-        final protocolStep = protocol.steps[stepIndex];
-        final totalInterventions = protocolStep.interventionIds.length;
-        final completedInterventions = newResults.keys.length;
-        final percent = totalInterventions > 0 ? (completedInterventions / totalInterventions * 100).round() : 0;
+        // Calculate completion percent based on interventions in this step
+        final protocol = await getProtocolById(enrollment.protocolId);
+        if (protocol != null && stepIndex < protocol.steps.length) {
+          final protocolStep = protocol.steps[stepIndex];
+          final totalInterventions = protocolStep.interventionIds.length;
+          final completedInterventions = newResults.keys.length;
+          final percent = totalInterventions > 0 ? (completedInterventions / totalInterventions * 100).round() : 0;
 
-        updatedProgress[stepIndex] = StepProgress(
-          stepId: step.stepId,
-          stepOrder: step.stepOrder,
-          status: step.status,
-          startedAt: step.startedAt,
-          completedAt: step.completedAt,
-          interventionResults: newResults,
-          completionPercent: percent,
-        );
-
-        // If all interventions completed, mark step as completed
-        if (completedInterventions >= totalInterventions) {
           updatedProgress[stepIndex] = StepProgress(
             stepId: step.stepId,
             stepOrder: step.stepOrder,
-            status: StepStatus.completed,
+            status: step.status,
             startedAt: step.startedAt,
-            completedAt: DateTime.now(),
+            completedAt: step.completedAt,
             interventionResults: newResults,
-            completionPercent: 100,
+            completionPercent: percent,
           );
+
+          // If all interventions completed, mark step as completed
+          if (completedInterventions >= totalInterventions) {
+            updatedProgress[stepIndex] = StepProgress(
+              stepId: step.stepId,
+              stepOrder: step.stepOrder,
+              status: StepStatus.completed,
+              startedAt: step.startedAt,
+              completedAt: DateTime.now(),
+              interventionResults: newResults,
+              completionPercent: 100,
+            );
+          }
         }
       }
-    }
 
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'step_progress': updatedProgress.map((s) => s.toMap()).toList(),
-    });
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'step_progress': updatedProgress.map((s) => s.toMap()).toList(),
+      });
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException('Erro ao registrar resultado: $e', originalError: e);
+    }
   }
 
   /// Adapt protocol based on patient progress (AI-assisted)
@@ -198,30 +240,46 @@ class ProtocolService {
     required String enrollmentId,
     required Map<String, dynamic> adaptations,
   }) async {
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'adaptations': adaptations,
-    });
+    try {
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'adaptations': adaptations,
+      });
+    } catch (e) {
+      throw AppException('Erro ao adaptar protocolo: $e', originalError: e);
+    }
   }
 
   /// Pause enrollment
   Future<void> pauseEnrollment(String enrollmentId) async {
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'status': EnrollmentStatus.paused.name,
-    });
+    try {
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'status': EnrollmentStatus.paused.name,
+      });
+    } catch (e) {
+      throw AppException('Erro ao pausar matrícula: $e', originalError: e);
+    }
   }
 
   /// Resume enrollment
   Future<void> resumeEnrollment(String enrollmentId) async {
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'status': EnrollmentStatus.active.name,
-    });
+    try {
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'status': EnrollmentStatus.active.name,
+      });
+    } catch (e) {
+      throw AppException('Erro ao retomar matrícula: $e', originalError: e);
+    }
   }
 
   /// Cancel enrollment
   Future<void> cancelEnrollment(String enrollmentId) async {
-    await _db.collection('protocol_enrollments').doc(enrollmentId).update({
-      'status': EnrollmentStatus.cancelled.name,
-    });
+    try {
+      await _db.collection('protocol_enrollments').doc(enrollmentId).update({
+        'status': EnrollmentStatus.cancelled.name,
+      });
+    } catch (e) {
+      throw AppException('Erro ao cancelar matrícula: $e', originalError: e);
+    }
   }
 
   /// Stream enrollment for real-time updates

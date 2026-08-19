@@ -1,10 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/mood_model.dart';
+import '../../core/errors/app_exception.dart';
 
 class MoodService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
+
+  MoodService({
+    required FirebaseFirestore firestore,
+    required FirebaseAuth auth,
+  })  : _db = firestore,
+        _auth = auth;
 
   /// Paciente registra como está se sentindo hoje
   Future<void> addEntry({
@@ -14,7 +21,7 @@ class MoodService {
     String? notes,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('Usuário não autenticado.');
+    if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
       await _db.collection('mood_entries').add({
@@ -26,14 +33,14 @@ class MoodService {
         'created_at': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      throw Exception('Erro ao registrar humor: $e');
+      throw AppException('Erro ao registrar humor: $e', originalError: e);
     }
   }
 
   /// Paciente vê seu próprio histórico
   Future<List<MoodEntry>> getMyEntries({int limit = 30}) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('Usuário não autenticado.');
+    if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
       final snap = await _db
@@ -47,8 +54,20 @@ class MoodService {
           .map((d) => MoodEntry.fromMap({'id': d.id, ...d.data()}))
           .toList();
     } catch (e) {
-      throw Exception('Erro ao buscar histórico: $e');
+      throw AppException('Erro ao buscar histórico: $e', originalError: e);
     }
+  }
+
+  /// Stream de entradas de humor do paciente (tempo real)
+  Stream<List<MoodEntry>> moodStreamForPatient(String patientId) {
+    return _db
+        .collection('mood_entries')
+        .where('patient_id', isEqualTo: patientId)
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => MoodEntry.fromMap({'id': d.id, ...d.data()}))
+            .toList());
   }
 
   /// Psicólogo vê o histórico de humor de um paciente vinculado
@@ -66,7 +85,7 @@ class MoodService {
           .map((d) => MoodEntry.fromMap({'id': d.id, ...d.data()}))
           .toList();
     } catch (e) {
-      throw Exception('Erro ao buscar histórico do paciente: $e');
+      throw AppException('Erro ao buscar histórico do paciente: $e', originalError: e);
     }
   }
 

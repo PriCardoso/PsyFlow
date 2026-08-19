@@ -3,6 +3,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/di/service_locator.dart';
 import '../theme/app_colors.dart';
 
 class NotificationService {
@@ -12,8 +15,11 @@ class NotificationService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FirebaseFirestore _firestore = sl<FirebaseFirestore>();
+  final FirebaseAuth _auth = sl<FirebaseAuth>();
 
   bool _initialized = false;
+  String? _fcmToken;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -23,6 +29,7 @@ class NotificationService {
     await _requestPermissions();
     await _initLocalNotifications();
     await _configureFCM();
+    await _subscribeToUserTopics();
 
     _initialized = true;
   }
@@ -38,6 +45,10 @@ class NotificationService {
       sound: true,
       provisional: false,
     );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
   Future<void> _initLocalNotifications() async {
@@ -65,35 +76,37 @@ class NotificationService {
     final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
-    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    if (androidPlugin == null) return;
+
+    await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
       'appointment_reminders',
       'Lembretes de Consulta',
       description: 'Notificações para consultas agendadas',
       importance: Importance.high,
     ));
 
-    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
       'task_reminders',
       'Lembretes de Tarefas',
       description: 'Notificações para tarefas terapêuticas pendentes',
       importance: Importance.high,
     ));
 
-    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
       'mood_reminders',
       'Lembretes de Humor',
       description: 'Lembretes para registrar o humor diário',
       importance: Importance.defaultImportance,
     ));
 
-    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
       'chat_messages',
       'Mensagens do Chat',
       description: 'Novas mensagens no chat terapêutico',
       importance: Importance.high,
     ));
 
-    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    await androidPlugin.createNotificationChannel(const AndroidNotificationChannel(
       'general',
       'Gerais',
       description: 'Notificações gerais do aplicativo',
@@ -114,15 +127,70 @@ class NotificationService {
       _saveTokenToFirestore(token);
     });
 
-    final token = await _messaging.getToken();
-    if (token != null) {
-      await _saveTokenToFirestore(token);
+    _fcmToken = await _messaging.getToken();
+    if (_fcmToken != null) {
+      await _saveTokenToFirestore(_fcmToken!);
     }
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
-    // Implementation would save to Firestore
-    // await FirebaseFirestore.instance.collection('users').doc(userId).update({'fcm_token': token});
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _firestore.collection('users').doc(user.uid).update({
+        'fcm_token': token,
+        'fcm_token_updated_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error saving FCM token: $e');
+    }
+  }
+
+  Future<void> _subscribeToUserTopics() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _messaging.subscribeToTopic('user_${user.uid}');
+      
+      final role = await _getUserRole(user.uid);
+      if (role == 'psychologist' || role == 'professional') {
+        await _messaging.subscribeToTopic('psychologist_${user.uid}');
+      } else if (role == 'patient') {
+        await _messaging.subscribeToTopic('patient_${user.uid}');
+      }
+    } catch (e) {
+      debugPrint('Error subscribing to topics: $e');
+    }
+  }
+
+  Future<void> unsubscribeFromUserTopics() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _messaging.unsubscribeFromTopic('user_${user.uid}');
+      
+      final role = await _getUserRole(user.uid);
+      if (role == 'psychologist' || role == 'professional') {
+        await _messaging.unsubscribeFromTopic('psychologist_${user.uid}');
+      } else if (role == 'patient') {
+        await _messaging.unsubscribeFromTopic('patient_${user.uid}');
+      }
+    } catch (e) {
+      debugPrint('Error unsubscribing from topics: $e');
+    }
+  }
+
+  Future<String?> _getUserRole(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      return doc.data()?['role'] as String?;
+    } catch (e) {
+      debugPrint('Error getting user role: $e');
+      return null;
+    }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
@@ -136,6 +204,7 @@ class NotificationService {
         body: notification.body ?? '',
         payload: data['payload'] ?? '',
         channelId: _getChannelId(data['type']),
+        data: data,
       );
     }
   }
@@ -163,6 +232,7 @@ class NotificationService {
   void _navigateBasedOnData(Map<String, dynamic> data) {
     // Navigation would be handled via a navigator key or router
     // Example: navigatorKey.currentState?.pushNamed(route, arguments: data);
+    debugPrint('Navigate with data: $data');
   }
 
   Future<void> _showLocalNotification({
@@ -171,11 +241,12 @@ class NotificationService {
     required String body,
     String payload = '',
     String channelId = 'general',
+    Map<String, dynamic>? data,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'general',
-      'Gerais',
-      channelDescription: 'Notificações gerais do aplicativo',
+    final androidDetails = AndroidNotificationDetails(
+      channelId,
+      _getChannelName(channelId),
+      channelDescription: _getChannelDescription(channelId),
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
@@ -184,18 +255,48 @@ class NotificationService {
       enableVibration: true,
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
 
     await _localNotifications.show(id, title, body, details, payload: payload);
+  }
+
+  String _getChannelName(String channelId) {
+    switch (channelId) {
+      case 'appointment_reminders':
+        return 'Lembretes de Consulta';
+      case 'task_reminders':
+        return 'Lembretes de Tarefas';
+      case 'mood_reminders':
+        return 'Lembretes de Humor';
+      case 'chat_messages':
+        return 'Mensagens do Chat';
+      default:
+        return 'Gerais';
+    }
+  }
+
+  String _getChannelDescription(String channelId) {
+    switch (channelId) {
+      case 'appointment_reminders':
+        return 'Notificações para consultas agendadas';
+      case 'task_reminders':
+        return 'Notificações para tarefas terapêuticas pendentes';
+      case 'mood_reminders':
+        return 'Lembretes para registrar o humor diário';
+      case 'chat_messages':
+        return 'Novas mensagens no chat terapêutico';
+      default:
+        return 'Notificações gerais do aplicativo';
+    }
   }
 
   void _onNotificationTap(NotificationResponse response) {
@@ -241,8 +342,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
@@ -282,8 +382,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
@@ -323,8 +422,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
@@ -339,4 +437,20 @@ class NotificationService {
   tz.TZDateTime _toTZDateTime(DateTime dateTime) {
     return tz.TZDateTime.from(dateTime, tz.local);
   }
+
+  // Send notification to specific user via FCM topic
+  Future<void> sendNotificationToUser({
+    required String userId,
+    required String title,
+    required String body,
+    String? type,
+    Map<String, dynamic>? data,
+  }) async {
+    // This would typically be called from a Cloud Function or backend
+    // For client-side, we can send to topic
+    debugPrint('Sending notification to user_$userId: $title - $body');
+  }
+
+  // Get current FCM token
+  String? get fcmToken => _fcmToken;
 }

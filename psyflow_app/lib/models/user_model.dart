@@ -125,16 +125,16 @@ class UserModel {
 
     return UserModel(
       uid: id,
-      email: map["email"] ?? "",
-      fullName: map["full_name"] ?? map["fullName"] ?? "",
+      email: map["email"] as String? ?? "",
+      fullName: (map["full_name"] ?? map["fullName"]) as String? ?? "",
       role: parsedRole,
       specialty: parsedSpec,
-      phone: map["phone"],
-      photoUrl: map["photo_url"] ?? map["photoUrl"],
-      crp: reg,
-      professionalRegistration: reg,
-      bio: map["bio"],
-      active: map["active"] ?? true,
+      phone: map["phone"] as String?,
+      photoUrl: (map["photo_url"] ?? map["photoUrl"]) as String?,
+      crp: reg as String?,
+      professionalRegistration: reg as String?,
+      bio: map["bio"] as String?,
+      active: map["active"] as bool? ?? true,
       createdAt: parsedDate,
     );
   }

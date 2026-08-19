@@ -1,9 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/errors/app_exception.dart';
 
 class UserService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
+
+  UserService({
+    required FirebaseFirestore firestore,
+    required FirebaseAuth auth,
+  })  : _db = firestore,
+        _auth = auth;
 
   Future<void> saveProfile({
     required String role,
@@ -13,19 +20,23 @@ class UserService {
     String? bio,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('Usuário não autenticado.');
+    if (user == null) throw AppException('Usuário não autenticado.');
 
-    await _db.collection('users').doc(user.uid).set({
-      'id': user.uid,
-      'email': user.email,
-      'role': role,
-      'full_name': fullName,
-      'phone': phone,
-      'crp': crp,
-      'bio': bio,
-      'profile_complete': true,
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      await _db.collection('users').doc(user.uid).set({
+        'id': user.uid,
+        'email': user.email,
+        'role': role,
+        'full_name': fullName,
+        'phone': phone,
+        'crp': crp,
+        'bio': bio,
+        'profile_complete': true,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      throw AppException('Erro ao salvar perfil: $e', originalError: e);
+    }
   }
 
   Future<Map<String, dynamic>?> getProfile() async {
@@ -37,7 +48,7 @@ class UserService {
       if (!doc.exists) return null;
       return doc.data();
     } catch (e) {
-      throw Exception('Erro ao carregar perfil: $e');
+      throw AppException('Erro ao carregar perfil: $e', originalError: e);
     }
   }
 
@@ -47,7 +58,7 @@ class UserService {
       if (!doc.exists) return null;
       return {'id': doc.id, ...doc.data()!};
     } catch (e) {
-      throw Exception('Erro ao buscar usuário: $e');
+      throw AppException('Erro ao buscar usuário: $e', originalError: e);
     }
   }
 
@@ -59,7 +70,7 @@ class UserService {
           .get();
       return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
     } catch (e) {
-      throw Exception('Erro ao listar psicólogos: $e');
+      throw AppException('Erro ao listar psicólogos: $e', originalError: e);
     }
   }
 }

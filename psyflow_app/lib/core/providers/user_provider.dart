@@ -1,61 +1,54 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/user_model.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/services/user_service.dart';
+import '../../core/errors/app_exception.dart';
 
 class UserProvider extends ChangeNotifier {
-  final UserService _userService = UserService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserService _userService = sl<UserService>();
+  final FirebaseAuth _auth = sl<FirebaseAuth>();
 
-  UserModel? _currentUser;
+  Map<String, dynamic>? _profile;
   bool _isLoading = false;
   String? _error;
 
-  UserModel? get currentUser => _currentUser;
+  Map<String, dynamic>? get profile => _profile;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isAuthenticated => _currentUser != null;
-  bool get isPsychologist => _currentUser?.isProfessional ?? false;
-  bool get isProfessional => _currentUser?.isProfessional ?? false;
-  bool get isPatient => _currentUser?.role == UserRole.patient;
+  bool get isAuthenticated => _auth.currentUser != null;
+  String? get userId => _auth.currentUser?.uid;
+  String? get userEmail => _auth.currentUser?.email;
+  String? get userRole => _profile?['role'] as String?;
+  String? get fullName => _profile?['full_name'] as String?;
+  bool get isProfileComplete => _profile?['profile_complete'] == true;
 
-  UserProvider() {
-    _initAuthListener();
-  }
+  Future<void> loadProfile() async {
+    if (_auth.currentUser == null) {
+      _profile = null;
+      notifyListeners();
+      return;
+    }
 
-  void _initAuthListener() {
-    _auth.authStateChanges().listen((User? user) async {
-      if (user != null) {
-        await loadUserProfile(user.uid);
-      } else {
-        _currentUser = null;
-        notifyListeners();
-      }
-    });
-  }
-
-  Future<void> loadUserProfile(String uid) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final profile = await _userService.getProfile();
-      if (profile != null) {
-        _currentUser = UserModel.fromMap(profile, uid);
-      }
+      _profile = await _userService.getProfile();
+      _error = null;
     } catch (e) {
-      _error = 'Erro ao carregar perfil: $e';
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      debugPrint('UserProvider.loadProfile error: $appException');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<bool> completeProfile({
+  Future<void> saveProfile({
     required String role,
     required String fullName,
-    String? specialty,
     String? phone,
     String? crp,
     String? bio,
@@ -72,43 +65,19 @@ class UserProvider extends ChangeNotifier {
         crp: crp,
         bio: bio,
       );
-      await loadUserProfile(_auth.currentUser!.uid);
-      return true;
+      await loadProfile();
     } catch (e) {
-      _error = 'Erro ao completar perfil: $e';
-      notifyListeners();
-      return false;
+      final appException = mapToAppException(e);
+      _error = appException.message;
+      rethrow;
     } finally {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> updateProfile({
-    String? fullName,
-    String? phone,
-    String? bio,
-    String? crp,
-  }) async {
-    if (_currentUser == null) return;
-
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await _userService.saveProfile(
-        role: _currentUser!.role.name,
-        fullName: fullName ?? _currentUser!.fullName,
-        phone: phone ?? _currentUser!.phone,
-        crp: crp ?? _currentUser!.crp,
-        bio: bio ?? _currentUser!.bio,
-      );
-      await loadUserProfile(_auth.currentUser!.uid);
-    } catch (e) {
-      _error = 'Erro ao atualizar perfil: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  Future<void> refreshProfile() async {
+    await loadProfile();
   }
 
   void clearError() {
@@ -116,9 +85,9 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signOut() async {
-    await _auth.signOut();
-    _currentUser = null;
+  void logout() {
+    _profile = null;
+    _error = null;
     notifyListeners();
   }
 }

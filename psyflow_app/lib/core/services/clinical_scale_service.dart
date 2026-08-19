@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:psyflow_app/models/clinical_scale_model.dart';
+import '../../../models/clinical_scale_model.dart';
+import '../../core/errors/app_exception.dart';
 
 class ClinicalScaleService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+
+  ClinicalScaleService({required FirebaseFirestore firestore}) : _db = firestore;
 
   /// Predefined clinical scales
   static final List<ClinicalScaleModel> _defaultScales = [
@@ -62,7 +65,7 @@ class ClinicalScaleService {
         ClinicalScaleQuestion(id: 10, text: 'Mexe mãos/pés ou remexe-se na cadeira', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
         ClinicalScaleQuestion(id: 11, text: 'Levanta-se quando se espera que permaneça sentado', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
         ClinicalScaleQuestion(id: 12, text: 'Corre/sobe em situações inapropriadas', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
-        ClinicalScaleQuestion(id: 13, text: 'Dificuldade em brincar 조용히', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
+        ClinicalScaleQuestion(id: 13, text: 'Dificuldade em brincar silenciosamente', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
         ClinicalScaleQuestion(id: 14, text: 'Está sempre "a mil" / age como se tivesse motor', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
         ClinicalScaleQuestion(id: 15, text: 'Fala excessivamente', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
         ClinicalScaleQuestion(id: 16, text: 'Responde antes da pergunta ser completada', options: ['Nunca', 'Às vezes', 'Frequentemente', 'Muito frequentemente'], optionValues: [0, 1, 2, 3]),
@@ -96,42 +99,54 @@ class ClinicalScaleService {
     required int totalScore,
     required String severityInterpretation,
   }) async {
-    await _db.collection('clinical_scale_responses').add({
-      'scale_id': scaleId,
-      'scale_code': scaleCode,
-      'patient_id': patientId,
-      'professional_id': professionalId,
-      'answers': answers.map((k, v) => MapEntry(k.toString(), v)),
-      'total_score': totalScore,
-      'severity_interpretation': severityInterpretation,
-      'completed_at': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _db.collection('clinical_scale_responses').add({
+        'scale_id': scaleId,
+        'scale_code': scaleCode,
+        'patient_id': patientId,
+        'professional_id': professionalId,
+        'answers': answers.map((k, v) => MapEntry(k.toString(), v)),
+        'total_score': totalScore,
+        'severity_interpretation': severityInterpretation,
+        'completed_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw AppException('Erro ao enviar escala: $e', originalError: e);
+    }
   }
 
   /// Get scale responses for a patient
   Future<List<ClinicalScaleResponseModel>> getPatientScaleResponses(String patientId) async {
-    final snapshot = await _db
-        .collection('clinical_scale_responses')
-        .where('patient_id', isEqualTo: patientId)
-        .orderBy('completed_at', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('clinical_scale_responses')
+          .where('patient_id', isEqualTo: patientId)
+          .orderBy('completed_at', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
-        .toList();
+      return snapshot.docs
+          .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
+          .toList();
+    } catch (e) {
+      throw AppException('Erro ao buscar respostas: $e', originalError: e);
+    }
   }
 
   /// Get scale responses for a professional's patients
   Future<List<ClinicalScaleResponseModel>> getProfessionalScaleResponses(String professionalId) async {
-    final snapshot = await _db
-        .collection('clinical_scale_responses')
-        .where('professional_id', isEqualTo: professionalId)
-        .orderBy('completed_at', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('clinical_scale_responses')
+          .where('professional_id', isEqualTo: professionalId)
+          .orderBy('completed_at', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
-        .toList();
+      return snapshot.docs
+          .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
+          .toList();
+    } catch (e) {
+      throw AppException('Erro ao buscar respostas: $e', originalError: e);
+    }
   }
 
   /// Get latest response for a specific scale and patient
@@ -139,16 +154,20 @@ class ClinicalScaleService {
     required String patientId,
     required String scaleCode,
   }) async {
-    final snapshot = await _db
-        .collection('clinical_scale_responses')
-        .where('patient_id', isEqualTo: patientId)
-        .where('scale_code', isEqualTo: scaleCode)
-        .orderBy('completed_at', descending: true)
-        .limit(1)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('clinical_scale_responses')
+          .where('patient_id', isEqualTo: patientId)
+          .where('scale_code', isEqualTo: scaleCode)
+          .orderBy('completed_at', descending: true)
+          .limit(1)
+          .get();
 
-    if (snapshot.docs.isEmpty) return null;
-    return ClinicalScaleResponseModel.fromMap({'id': snapshot.docs.first.id, ...snapshot.docs.first.data()});
+      if (snapshot.docs.isEmpty) return null;
+      return ClinicalScaleResponseModel.fromMap({'id': snapshot.docs.first.id, ...snapshot.docs.first.data()});
+    } catch (e) {
+      throw AppException('Erro ao buscar resposta: $e', originalError: e);
+    }
   }
 
   /// Stream responses for real-time updates

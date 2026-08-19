@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/appointment_item.dart';
 import '../../models/psychologist_summary.dart';
 import '../../models/availability_slot.dart';
+import '../../core/errors/app_exception.dart';
 
 class AppointmentService {
   final FirebaseFirestore _db;
@@ -109,20 +110,28 @@ class AppointmentService {
     required DateTime endTime,
     required String modality,
   }) async {
-    await _db.collection('availability_slots').add({
-      'psychologist_id': psychologistId,
-      'date': date.toIso8601String().split('T')[0],
-      'start_time': startTime.toIso8601String().split('T')[1].substring(0, 5),
-      'end_time': endTime.toIso8601String().split('T')[1].substring(0, 5),
-      'modality': modality,
-      'is_active': true,
-      'is_booked': false,
-      'created_at': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _db.collection('availability_slots').add({
+        'psychologist_id': psychologistId,
+        'date': date.toIso8601String().split('T')[0],
+        'start_time': startTime.toIso8601String().split('T')[1].substring(0, 5),
+        'end_time': endTime.toIso8601String().split('T')[1].substring(0, 5),
+        'modality': modality,
+        'is_active': true,
+        'is_booked': false,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw AppException('Erro ao adicionar horário: $e', originalError: e);
+    }
   }
 
   Future<void> deleteSlot(String slotId) async {
-    await _db.collection('availability_slots').doc(slotId).delete();
+    try {
+      await _db.collection('availability_slots').doc(slotId).delete();
+    } catch (e) {
+      throw AppException('Erro ao excluir horário: $e', originalError: e);
+    }
   }
 
   Future<void> bookAppointment({
@@ -131,27 +140,35 @@ class AppointmentService {
     required AvailabilitySlot slot,
     required String modality,
   }) async {
-    await _db.runTransaction((tx) async {
-      final slotRef = _db.collection('availability_slots').doc(slot.id);
-      tx.update(slotRef, {'is_booked': true, 'is_active': false});
+    try {
+      await _db.runTransaction((tx) async {
+        final slotRef = _db.collection('availability_slots').doc(slot.id);
+        tx.update(slotRef, {'is_booked': true, 'is_active': false});
 
-      tx.set(_db.collection('appointments').doc(), {
-        'psychologist_id': psychologistId,
-        'patient_id': patientId,
-        'slot_id': slot.id,
-        'scheduled_date': slot.date.toIso8601String().split('T')[0],
-        'start_time': slot.startTime.toIso8601String().split('T')[1].substring(0, 5),
-        'end_time': slot.endTime.toIso8601String().split('T')[1].substring(0, 5),
-        'modality': modality,
-        'status': 'scheduled',
-        'created_at': FieldValue.serverTimestamp(),
+        tx.set(_db.collection('appointments').doc(), {
+          'psychologist_id': psychologistId,
+          'patient_id': patientId,
+          'slot_id': slot.id,
+          'scheduled_date': slot.date.toIso8601String().split('T')[0],
+          'start_time': slot.startTime.toIso8601String().split('T')[1].substring(0, 5),
+          'end_time': slot.endTime.toIso8601String().split('T')[1].substring(0, 5),
+          'modality': modality,
+          'status': 'scheduled',
+          'created_at': FieldValue.serverTimestamp(),
+        });
       });
-    });
+    } catch (e) {
+      throw AppException('Erro ao agendar consulta: $e', originalError: e);
+    }
   }
 
   Future<void> cancelAppointment(String appointmentId) async {
-    await _db.collection('appointments').doc(appointmentId).update({
-      'status': 'cancelled',
-    });
+    try {
+      await _db.collection('appointments').doc(appointmentId).update({
+        'status': 'cancelled',
+      });
+    } catch (e) {
+      throw AppException('Erro ao cancelar consulta: $e', originalError: e);
+    }
   }
 }

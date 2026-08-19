@@ -1,32 +1,31 @@
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
+import '../../core/errors/app_exception.dart';
 
 class StorageService {
-  StorageService._();
+  final FirebaseStorage _storage;
 
-  static final StorageService instance =
-      StorageService._();
-
-  final FirebaseStorage storage =
-      FirebaseStorage.instance;
+  StorageService({required FirebaseStorage storage}) : _storage = storage;
 
   Future<String> uploadFile({
     required String path,
     required File file,
   }) async {
-
-    final ref = storage.ref(path);
-
-    await ref.putFile(file);
-
-    return await ref.getDownloadURL();
+    try {
+      final ref = _storage.ref(path);
+      await ref.putFile(file);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      throw AppException('Erro ao fazer upload: $e', originalError: e);
+    }
   }
 
-  Future<void> deleteFile(
-    String path,
-  ) async {
-
-    await storage.ref(path).delete();
+  Future<void> deleteFile(String path) async {
+    try {
+      await _storage.ref(path).delete();
+    } catch (e) {
+      throw AppException('Erro ao excluir arquivo: $e', originalError: e);
+    }
   }
 }

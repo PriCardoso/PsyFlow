@@ -13,10 +13,10 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'],
-      email: map['email'],
-      role: map['role'],
-      workspaceId: map['workspace_id'],
+      id: map['id'] as String,
+      email: map['email'] as String,
+      role: map['role'] as String,
+      workspaceId: map['workspace_id'] as String?,
     );
   }
 }
