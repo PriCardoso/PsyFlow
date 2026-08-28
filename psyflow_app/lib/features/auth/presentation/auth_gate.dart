@@ -111,8 +111,11 @@ class _ProfileFutureBuilderState extends State<_ProfileFutureBuilder> {
           return CompleteProfilePage(role: role);
         }
 
+        final fullName = profile['full_name'] as String? ??
+            profile['fullName'] as String? ??
+            profile['name'] as String? ??
+            widget.user.displayName;
         final role = profile['role'] as String?;
-        final fullName = profile['full_name'] as String? ?? profile['fullName'] as String?;
 
         if (role == 'psychologist' || role == 'professional') {
           return PsychologistDashboardPage(initialName: fullName);

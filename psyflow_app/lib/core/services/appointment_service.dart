@@ -105,7 +105,11 @@ class AppointmentService {
     for (final doc in snap.docs) {
       final item = AppointmentItem.fromMap({'id': doc.id, ...doc.data()});
       appointments.add(item);
-      if (item.patientName == null || item.patientName!.trim().isEmpty) {
+      if (item.patientName == null ||
+          item.patientName!.trim().isEmpty ||
+          item.patientName == item.psychologistName ||
+          item.patientName == 'Paciente' ||
+          item.patientName!.contains('@')) {
         patientIds.add(item.patientId);
       }
     }
@@ -118,15 +122,20 @@ class AppointmentService {
       for (final doc in userDocs) {
         if (doc.exists) {
           final d = doc.data()!;
-          namesMap[doc.id] = d['full_name'] ?? d['fullName'] ?? 'Paciente';
+          namesMap[doc.id] = d['full_name'] ?? d['fullName'] ?? d['name'] ?? 'Paciente';
         }
       }
 
       return appointments.map((a) {
-        if (a.patientName == null || a.patientName!.trim().isEmpty) {
-          return a.copyWith(
-            patientName: namesMap[a.patientId] ?? 'Paciente',
-          );
+        if (a.patientName == null ||
+            a.patientName!.trim().isEmpty ||
+            a.patientName == a.psychologistName ||
+            a.patientName == 'Paciente' ||
+            a.patientName!.contains('@')) {
+          final resolved = namesMap[a.patientId];
+          if (resolved != null && resolved.trim().isNotEmpty && resolved != 'Paciente') {
+            return a.copyWith(patientName: resolved);
+          }
         }
         return a;
       }).toList();

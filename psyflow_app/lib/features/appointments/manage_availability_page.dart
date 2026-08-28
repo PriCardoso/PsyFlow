@@ -69,7 +69,7 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
   }
 
   void _openAddSlotsModal() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -219,7 +219,7 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    a.otherPartyName ?? 'Paciente',
+                                    a.displayPatientName,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,

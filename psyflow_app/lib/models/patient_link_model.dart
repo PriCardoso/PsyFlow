@@ -16,9 +16,11 @@ class PatientProfile {
   });
 
   factory PatientProfile.fromMap(Map<String, dynamic> map) {
+    // Suporta full_name (snake_case) e fullName (camelCase)
+    final name = (map['full_name'] ?? map['fullName'] ?? map['name'] ?? 'Paciente') as String;
     return PatientProfile(
       id: map['id'] as String? ?? '',
-      fullName: map['full_name'] as String? ?? 'Paciente',
+      fullName: name.isNotEmpty ? name : 'Paciente',
       email: map['email'] as String? ?? '',
       bio: map['bio'] as String?,
       phone: map['phone'] as String?,

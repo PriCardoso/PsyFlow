@@ -20,7 +20,11 @@ class UserProvider extends ChangeNotifier {
   String? get userId => _auth.currentUser?.uid;
   String? get userEmail => _auth.currentUser?.email;
   String? get userRole => _profile?['role'] as String?;
-  String? get fullName => _profile?['full_name'] as String?;
+  String? get fullName =>
+      _profile?['full_name'] as String? ??
+      _profile?['fullName'] as String? ??
+      _profile?['name'] as String? ??
+      _auth.currentUser?.displayName;
   bool get isProfileComplete => _profile?['profile_complete'] == true;
 
   UserProvider() {

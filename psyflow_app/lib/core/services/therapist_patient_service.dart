@@ -227,7 +227,7 @@ class TherapistPatientService {
           // Métricas de tarefas
           try {
             final tasksSnap = await _db
-                .collection('patient_tasks')
+                .collection('tasks')
                 .where('patient_id', isEqualTo: patientId)
                 .get();
 

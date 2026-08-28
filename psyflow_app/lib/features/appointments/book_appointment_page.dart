@@ -204,7 +204,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          a.otherPartyName,
+                                          a.displayPsychologistName,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w800,
                                             fontSize: 15,
@@ -463,12 +463,21 @@ class _SlotPickerSheetState extends State<_SlotPickerSheet> {
 
     setState(() => _booking = true);
     try {
+      String? pName = user.displayName;
+      try {
+        final profileDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (profileDoc.exists) {
+          final data = profileDoc.data();
+          pName = data?['full_name'] as String? ?? data?['fullName'] as String? ?? pName;
+        }
+      } catch (_) {}
+
       await widget.service.bookAppointment(
         psychologistId: widget.psychologist.id,
         psychologistName: widget.psychologist.fullName,
         psychologistCrp: widget.psychologist.crp,
         patientId: user.uid,
-        patientName: user.displayName ?? user.email,
+        patientName: (pName != null && pName.trim().isNotEmpty) ? pName.trim() : (user.displayName ?? user.email),
         slot: slot,
         modality: slot.modality,
       );

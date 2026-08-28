@@ -88,7 +88,7 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
   int get _totalTasksCount => _patientTasks.length;
 
   void _openReportGenerator() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (_) => ClinicalReportGeneratorDialog(
         patientId: widget.patientId,
@@ -112,7 +112,7 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
     String frequency = currentConfig.frequency;
     String reminderTime = currentConfig.reminderTime ?? '08:00';
 
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(

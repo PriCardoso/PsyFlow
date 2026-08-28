@@ -139,7 +139,7 @@ class _PsychologistScheduleScreenState
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(a.otherPartyName ?? 'Paciente', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                    Text(a.displayPatientName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                                     Text(_formatDateTime(a.startTime), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                   ],
                                 ),

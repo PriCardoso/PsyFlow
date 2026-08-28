@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
 import '../../../core/services/therapist_patient_service.dart';
+import '../../../core/services/user_service.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
@@ -48,6 +50,15 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
       return;
     }
     try {
+      final userDoc = await sl<UserService>().getProfile();
+      if (userDoc != null && mounted) {
+        final profileName = userDoc['full_name'] as String? ??
+            userDoc['fullName'] as String? ??
+            userDoc['name'] as String?;
+        if (profileName != null && profileName.trim().isNotEmpty) {
+          setState(() => userName = profileName.trim());
+        }
+      }
       final appts = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
       final links = await _therapistPatientService.getMyPatientsLinks();
       if (mounted) {
@@ -70,15 +81,29 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final firstName = userName?.split(' ').first ?? 'Psicólogo';
+    final userProvider = context.watch<UserProvider>();
+    final resolvedFullName = (userName?.trim().isNotEmpty == true)
+        ? userName
+        : (userProvider.fullName?.trim().isNotEmpty == true
+            ? userProvider.fullName
+            : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+                ? FirebaseAuth.instance.currentUser!.displayName
+                : null));
+
+    final firstName = (resolvedFullName != null && resolvedFullName.trim().isNotEmpty)
+        ? resolvedFullName.trim().split(' ').first
+        : (userEmail != null && userEmail!.contains('@')
+            ? userEmail!.split('@').first
+            : 'Psicólogo');
+
     final upcoming = _appointments.where((a) => a.isUpcoming).toList();
     final next = upcoming.isNotEmpty ? upcoming.first : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: AppDrawer(
-        userName: userName ?? 'Psicólogo',
-        userEmail: userEmail ?? '',
+        userName: resolvedFullName ?? 'Psicólogo',
+        userEmail: userEmail ?? userProvider.userEmail ?? '',
         roleLabel: 'Psicólogo(a)',
         accentColor: AppColors.psychologist,
         selectedIndex: 0,
@@ -91,22 +116,22 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
           DrawerMenuItem(
             label: 'Minha Agenda',
             icon: Icons.calendar_today_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAvailabilityPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage())),
           ),
           DrawerMenuItem(
             label: 'Meus Pacientes',
             icon: Icons.people_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LinkPatientPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const LinkPatientPage())),
           ),
           DrawerMenuItem(
             label: 'Tarefas',
             icon: Icons.task_alt_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PsychologistTasksPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage())),
           ),
           DrawerMenuItem(
             label: 'Configurações',
             icon: Icons.settings_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EditProfilePage())),
           ),
         ],
       ),
@@ -135,7 +160,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+                        onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EditProfilePage())),
                         child: Container(
                           width: 38,
                           height: 38,
@@ -173,7 +198,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                         ),
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                          MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
                         ).then((_) => _load()),
                         icon: const Icon(Icons.edit_calendar_rounded, size: 18),
                         label: const Text('Gerenciar agenda', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -187,7 +212,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                       footerLabel: 'Ver toda a agenda',
                       onFooterTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                        MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
                       ).then((_) => _load()),
                       child: _loading
                           ? const Padding(
@@ -262,7 +287,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            next.otherPartyName ?? 'Paciente',
+                                            next.displayPatientName,
                                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
                                           ),
                                           const Text(
@@ -291,7 +316,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                                 footerLabel: 'Vincular paciente',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const LinkPatientPage()),
+                                  MaterialPageRoute<void>(builder: (_) => const LinkPatientPage()),
                                 ).then((_) => _load()),
                                 child: _loading
                                     ? const SizedBox(height: 50, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
@@ -319,7 +344,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                                 footerLabel: 'Atribuir atividade',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const PsychologistTasksPage()),
+                                  MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage()),
                                 ),
                                 child: const PanelEmptyState(
                                   icon: Icons.task_alt_rounded,
@@ -340,7 +365,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                       onFooterTap: upcoming.length > 1
                           ? () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const ManageAvailabilityPage()),
+                                MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
                               ).then((_) => _load())
                           : null,
                       child: _loading
@@ -359,7 +384,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
-                                                '${a.otherPartyName ?? 'Paciente'} • ${_formatDate(a.startTime)} ${_formatTime(a.startTime)}',
+                                                '${a.displayPatientName} • ${_formatDate(a.startTime)} ${_formatTime(a.startTime)}',
                                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                               ),
                                             ),

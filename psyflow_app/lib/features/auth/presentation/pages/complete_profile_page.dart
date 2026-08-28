@@ -43,8 +43,8 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
           context,
           MaterialPageRoute(
             builder: (_) => isPsychologist
-                ? const PsychologistDashboardPage()
-                : const PatientDashboardPage(),
+                ? PsychologistDashboardPage(initialName: fullNameController.text.trim())
+                : PatientDashboardPage(initialName: fullNameController.text.trim()),
           ),
           (_) => false,
         );

@@ -2,103 +2,208 @@
   "indexes": [
     {
       "collectionGroup": "mood_entries",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "psychologist_id", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
+        {
+          "fieldPath": "psychologist_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "due_date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "due_date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "psychologist_id", "order": "ASCENDING" },
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
+        {
+          "fieldPath": "psychologist_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "due_date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "invites",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "psychologist_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "psychologist_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "invites",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "code", "order": "ASCENDING" },
-        { "fieldPath": "used", "order": "ASCENDING" }
+        {
+          "fieldPath": "code",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "used",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "links",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "psychologist_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "psychologist_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "links",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "active", "order": "ASCENDING" }
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "availability_slots",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "psychologist_id", "order": "ASCENDING" },
-        { "fieldPath": "is_active", "order": "ASCENDING" }
+        {
+          "fieldPath": "psychologist_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_active",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "emotional_logs",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ai_recommendations",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "patient_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "patient_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "password_reset_codes",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "email", "order": "ASCENDING" },
-        { "fieldPath": "code", "order": "ASCENDING" },
-        { "fieldPath": "used", "order": "ASCENDING" }
+        {
+          "fieldPath": "email",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "code",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "used",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "journey_steps",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "protocol", "order": "ASCENDING" },
-        { "fieldPath": "phase", "order": "ASCENDING" }
+        {
+          "fieldPath": "protocol",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "phase",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "intervention_templates",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "is_active", "order": "ASCENDING" },
-        { "fieldPath": "category", "order": "ASCENDING" }
+        {
+          "fieldPath": "is_active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        }
       ]
     }
-  ]
+  ],
+  "fieldOverrides": []
 }

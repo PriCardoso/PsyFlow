@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
+import '../../../core/services/user_service.dart';
+import '../../../core/providers/user_provider.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
@@ -45,6 +49,15 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
       return;
     }
     try {
+      final userDoc = await sl<UserService>().getProfile();
+      if (userDoc != null && mounted) {
+        final profileName = userDoc['full_name'] as String? ??
+            userDoc['fullName'] as String? ??
+            userDoc['name'] as String?;
+        if (profileName != null && profileName.trim().isNotEmpty) {
+          setState(() => userName = profileName.trim());
+        }
+      }
       final appts = await _appointmentService.getMyAppointmentsAsPatient(user.uid);
       if (mounted) setState(() => _appointments = appts);
     } catch (_) {}
@@ -61,15 +74,29 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final firstName = userName?.split(' ').first ?? 'Paciente';
+    final userProvider = context.watch<UserProvider>();
+    final resolvedFullName = (userName?.trim().isNotEmpty == true)
+        ? userName
+        : (userProvider.fullName?.trim().isNotEmpty == true
+            ? userProvider.fullName
+            : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+                ? FirebaseAuth.instance.currentUser!.displayName
+                : null));
+
+    final firstName = (resolvedFullName != null && resolvedFullName.trim().isNotEmpty)
+        ? resolvedFullName.trim().split(' ').first
+        : (userEmail != null && userEmail!.contains('@')
+            ? userEmail!.split('@').first
+            : 'Paciente');
+
     final upcoming = _appointments.where((a) => a.isUpcoming).toList();
     final next = upcoming.isNotEmpty ? upcoming.first : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: AppDrawer(
-        userName: userName ?? 'Paciente',
-        userEmail: userEmail ?? '',
+        userName: resolvedFullName ?? 'Paciente',
+        userEmail: userEmail ?? userProvider.userEmail ?? '',
         roleLabel: 'Paciente',
         accentColor: AppColors.patient,
         selectedIndex: 0,
@@ -82,32 +109,32 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           DrawerMenuItem(
             label: 'Espaço PsyFlow',
             icon: Icons.auto_awesome_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EspacoPsyFlowPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EspacoPsyFlowPage())),
           ),
           DrawerMenuItem(
             label: 'Minhas consultas',
             icon: Icons.calendar_today_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookAppointmentPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage())),
           ),
           DrawerMenuItem(
             label: 'Meu Psicólogo',
             icon: Icons.psychology_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AcceptLinkPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const AcceptLinkPage())),
           ),
           DrawerMenuItem(
             label: 'Minhas Tarefas',
             icon: Icons.task_alt_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientTasksPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const PatientTasksPage())),
           ),
           DrawerMenuItem(
             label: 'Meu Acompanhamento',
             icon: Icons.spa_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MoodPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const MoodPage())),
           ),
           DrawerMenuItem(
             label: 'Configurações',
             icon: Icons.settings_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EditProfilePage())),
           ),
         ],
       ),
@@ -136,7 +163,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+                        onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EditProfilePage())),
                         child: Container(
                           width: 38,
                           height: 38,
@@ -181,7 +208,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                         ),
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const BookAppointmentPage()),
+                          MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage()),
                         ).then((_) => _load()),
                         icon: const Icon(Icons.edit_calendar_rounded, size: 18),
                         label: const Text('Marcar consulta', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -195,7 +222,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                       footerLabel: 'Ver todas as consultas',
                       onFooterTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const BookAppointmentPage()),
+                        MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage()),
                       ).then((_) => _load()),
                       child: _loading
                           ? const Padding(
@@ -270,7 +297,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            next.otherPartyName ?? 'Psicólogo',
+                                            next.displayPsychologistName,
                                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
                                           ),
                                           const Text(
@@ -299,7 +326,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 footerLabel: 'Ver vínculo',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const AcceptLinkPage()),
+                                  MaterialPageRoute<void>(builder: (_) => const AcceptLinkPage()),
                                 ),
                                 child: const PanelEmptyState(
                                   icon: Icons.psychology_outlined,
@@ -314,7 +341,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 footerLabel: 'Check-in diário',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const MoodPage()),
+                                  MaterialPageRoute<void>(builder: (_) => const MoodPage()),
                                 ),
                                 child: const PanelEmptyState(
                                   icon: Icons.spa_rounded,
@@ -334,7 +361,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                       footerLabel: 'Ver todas as tarefas',
                       onFooterTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const PatientTasksPage()),
+                        MaterialPageRoute<void>(builder: (_) => const PatientTasksPage()),
                       ),
                       child: const PanelEmptyState(
                         icon: Icons.task_alt_rounded,
@@ -416,7 +443,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 label: '🎯 Foco & TDAH',
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(
+                                  MaterialPageRoute<void>(
                                     builder: (_) => const EspacoPsyFlowPage(initialCategory: 'foco_concentracao'),
                                   ),
                                 ),
@@ -425,7 +452,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 label: '🧘 Ansiedade',
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(
+                                  MaterialPageRoute<void>(
                                     builder: (_) => const EspacoPsyFlowPage(initialCategory: 'ansiedade'),
                                   ),
                                 ),
@@ -434,7 +461,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 label: '🧠 TCC',
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(
+                                  MaterialPageRoute<void>(
                                     builder: (_) => const EspacoPsyFlowPage(initialCategory: 'tcc'),
                                   ),
                                 ),
@@ -443,7 +470,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 label: '☀️ Ativação',
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(
+                                  MaterialPageRoute<void>(
                                     builder: (_) => const EspacoPsyFlowPage(initialCategory: 'depressao'),
                                   ),
                                 ),
@@ -467,7 +494,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                               ),
                               onPressed: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(
+                                MaterialPageRoute<void>(
                                   builder: (_) => const EspacoPsyFlowPage(),
                                 ),
                               ),

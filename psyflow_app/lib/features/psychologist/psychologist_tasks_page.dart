@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/services/therapist_patient_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
 import '../../models/patient_link_model.dart';
 import '../../models/task_template_model.dart';
@@ -15,8 +17,9 @@ class PsychologistTasksPage extends StatefulWidget {
 }
 
 class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
-  final _taskService = TaskService();
-  final _inviteService = InviteService();
+  final _taskService = sl<TaskService>();
+  final _inviteService = sl<InviteService>();
+  final _therapistService = sl<TherapistPatientService>();
 
   List<TaskItem> _tasks = [];
   List<PatientLink> _patients = [];
@@ -32,11 +35,43 @@ class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
     setState(() => _loading = true);
     try {
       final tasks = await _taskService.getTasksCreatedByMe();
-      final links = await _inviteService.getMyPatients();
+
+      // Busca pacientes dos dois sistemas de vínculo
+      List<PatientLink> allPatients = [];
+
+      // Sistema legado (InviteService → coleção 'links')
+      try {
+        final legacyLinks = await _inviteService.getMyPatients();
+        allPatients.addAll(legacyLinks);
+      } catch (_) {}
+
+      // Sistema novo (TherapistPatientService → coleção 'therapist_patient_links')
+      try {
+        final newLinks = await _therapistService.getMyPatientsLinks();
+        for (final link in newLinks) {
+          if (link.isActive && link.patientId != null) {
+            final alreadyAdded = allPatients.any((p) => p.patient.id == link.patientId);
+            if (!alreadyAdded) {
+              allPatients.add(PatientLink(
+                linkId: link.id,
+                active: true,
+                createdAt: link.createdAt,
+                patient: link.patientProfile ??
+                    PatientProfile(
+                      id: link.patientId!,
+                      fullName: 'Paciente',
+                      email: '',
+                    ),
+              ));
+            }
+          }
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _tasks = tasks;
-          _patients = links.where((l) => l.active).toList();
+          _patients = allPatients.where((l) => l.active).toList();
         });
       }
     } catch (e) {

@@ -31,14 +31,28 @@ class AppointmentItem {
 
   bool get isUpcoming => scheduledDate.isAfter(DateTime.now().subtract(const Duration(hours: 1)));
 
-  String get otherPartyName {
-    if (psychologistName != null && psychologistName!.trim().isNotEmpty) {
-      return psychologistName!;
-    }
+  String get displayPatientName {
     if (patientName != null && patientName!.trim().isNotEmpty) {
       return patientName!;
     }
+    return 'Paciente';
+  }
+
+  String get displayPsychologistName {
+    if (psychologistName != null && psychologistName!.trim().isNotEmpty) {
+      return psychologistName!;
+    }
     return 'Dr(a). Psicólogo(a)';
+  }
+
+  String get otherPartyName {
+    if (patientName != null && patientName!.trim().isNotEmpty) {
+      return patientName!;
+    }
+    if (psychologistName != null && psychologistName!.trim().isNotEmpty) {
+      return psychologistName!;
+    }
+    return 'Paciente';
   }
 
   AppointmentItem copyWith({
