@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/user_service.dart';
+import '../../../../core/services/analytics_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../auth_gate.dart';
 
@@ -36,12 +37,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final data = await sl<UserService>().getProfile();
     if (data != null && mounted) {
       setState(() {
-        role = data['role'];
-        email = data['email'];
-        fullNameController.text = data['full_name'] ?? '';
-        phoneController.text = data['phone'] ?? '';
-        crpController.text = data['crp'] ?? '';
-        bioController.text = data['bio'] ?? '';
+        role = data['role'] as String?;
+        email = data['email'] as String?;
+        fullNameController.text = data['full_name'] as String? ?? '';
+        phoneController.text = data['phone'] as String? ?? '';
+        crpController.text = data['crp'] as String? ?? '';
+        bioController.text = data['bio'] as String? ?? '';
         loading = false;
       });
     }
@@ -99,6 +100,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     if (confirm == true) {
+      await sl<AnalyticsService>().logLogout();
       await AuthService.instance.logout();
       if (mounted) {
         Navigator.pushAndRemoveUntil(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/analytics_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../features/auth/presentation/auth_gate.dart';
 import '../../features/auth/presentation/pages/edit_profile_page.dart';
 
@@ -50,6 +52,7 @@ class AppDrawer extends StatelessWidget {
     );
 
     if (confirm == true) {
+      await sl<AnalyticsService>().logLogout();
       await AuthService.instance.logout();
       if (context.mounted) {
         Navigator.pushAndRemoveUntil(

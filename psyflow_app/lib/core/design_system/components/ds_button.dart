@@ -47,10 +47,8 @@ class DSButton extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final effectiveColor = customColor ?? AppColors.primary;
     
-    final buttonStyle = _getButtonStyle(context, effectiveColor, isDark);
+    final buttonStyle = _getButtonStyle(context, effectiveColor, isDark, size);
     final textStyle = _getTextStyle(context, effectiveColor, isDark);
-    final padding = _getPadding();
-    final minSize = _getMinSize();
 
     final child = isLoading
         ? SizedBox(
@@ -115,10 +113,10 @@ class DSButton extends StatelessWidget {
     return isFullWidth ? SizedBox(width: double.infinity, child: button) : button;
   }
 
-  ButtonStyle _getButtonStyle(BuildContext context, Color color, bool isDark) {
+  ButtonStyle _getButtonStyle(BuildContext context, Color color, bool isDark, DSButtonSize size) {
     final baseStyle = ButtonStyle(
-      padding: WidgetStatePropertyAll(padding),
-      minimumSize: WidgetStatePropertyAll(minSize),
+      padding: WidgetStatePropertyAll(_getPadding(size)),
+      minimumSize: WidgetStatePropertyAll(_getMinSize(size)),
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppBorderRadius.button)),
       ),
@@ -163,7 +161,7 @@ class DSButton extends StatelessWidget {
     );
   }
 
-  EdgeInsetsGeometry _getPadding() {
+  static EdgeInsetsGeometry _getPadding(DSButtonSize size) {
     return switch (size) {
       DSButtonSize.small => EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       DSButtonSize.medium => EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
@@ -171,7 +169,7 @@ class DSButton extends StatelessWidget {
     };
   }
 
-  Size _getMinSize() {
+  static Size _getMinSize(DSButtonSize size) {
     return switch (size) {
       DSButtonSize.small => const Size(64, 32),
       DSButtonSize.medium => const Size(88, 40),

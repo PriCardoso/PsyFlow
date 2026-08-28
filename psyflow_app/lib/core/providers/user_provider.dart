@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/services/user_service.dart';
@@ -7,10 +8,10 @@ import '../../core/errors/app_exception.dart';
 class UserProvider extends ChangeNotifier {
   final UserService _userService = sl<UserService>();
   final FirebaseAuth _auth = sl<FirebaseAuth>();
-
   Map<String, dynamic>? _profile;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<User?>? _authSubscription;
 
   Map<String, dynamic>? get profile => _profile;
   bool get isLoading => _isLoading;
@@ -22,13 +23,27 @@ class UserProvider extends ChangeNotifier {
   String? get fullName => _profile?['full_name'] as String?;
   bool get isProfileComplete => _profile?['profile_complete'] == true;
 
+  UserProvider() {
+    // Listen to auth changes to keep profile in sync without manual refetching
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (user == null) {
+        _profile = null;
+        notifyListeners();
+      } else {
+        // Load profile only if not cached
+        if (_profile == null) loadProfile();
+      }
+    });
+  }
+
   Future<void> loadProfile() async {
     if (_auth.currentUser == null) {
       _profile = null;
       notifyListeners();
       return;
     }
-
+    // Avoid refetch if profile is already loaded
+    if (_profile != null) return;
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -89,5 +104,11 @@ class UserProvider extends ChangeNotifier {
     _profile = null;
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

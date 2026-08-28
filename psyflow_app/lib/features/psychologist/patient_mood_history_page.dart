@@ -178,18 +178,25 @@ class _MetricBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalized = value.clamp(1, 10);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+            Text('$normalized/10', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
         const SizedBox(height: 4),
         Row(
-          children: List.generate(5, (i) => Expanded(
+          children: List.generate(10, (i) => Expanded(
             child: Container(
               margin: const EdgeInsets.only(right: 2),
               height: 5,
               decoration: BoxDecoration(
-                color: i < value ? color : color.withValues(alpha: 0.15),
+                color: i < normalized ? color : color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),

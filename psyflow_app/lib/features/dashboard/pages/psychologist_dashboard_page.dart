@@ -3,13 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/appointment_service.dart';
-import '../../../core/services/invite_service.dart';
+import '../../../core/services/therapist_patient_service.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
-import '../../psychologist/patients_page.dart';
+import '../../patients/presentation/pages/link_patient_page.dart';
 import '../../tasks/psychologist_tasks_page.dart';
 import '../../appointments/manage_availability_page.dart';
 
@@ -24,7 +24,7 @@ class PsychologistDashboardPage extends StatefulWidget {
 
 class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
   final _appointmentService = sl<AppointmentService>();
-  final _inviteService = sl<InviteService>();
+  final _therapistPatientService = sl<TherapistPatientService>();
 
   String? userName;
   String? userEmail;
@@ -49,11 +49,11 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
     }
     try {
       final appts = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
-      final patients = await _inviteService.getMyPatients();
+      final links = await _therapistPatientService.getMyPatientsLinks();
       if (mounted) {
         setState(() {
           _appointments = appts;
-          _activePatients = patients.where((p) => p.active).length;
+          _activePatients = links.length;
         });
       }
     } catch (_) {}
@@ -94,9 +94,9 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAvailabilityPage())),
           ),
           DrawerMenuItem(
-            label: 'Pacientes',
+            label: 'Meus Pacientes',
             icon: Icons.people_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientsPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LinkPatientPage())),
           ),
           DrawerMenuItem(
             label: 'Tarefas',
@@ -288,10 +288,10 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                               width: (constraints.maxWidth - 16) / 2,
                               child: PanelCard(
                                 title: 'Meus Pacientes',
-                                footerLabel: 'Gerenciar vínculos',
+                                footerLabel: 'Vincular paciente',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const PatientsPage()),
+                                  MaterialPageRoute(builder: (_) => const LinkPatientPage()),
                                 ).then((_) => _load()),
                                 child: _loading
                                     ? const SizedBox(height: 50, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))

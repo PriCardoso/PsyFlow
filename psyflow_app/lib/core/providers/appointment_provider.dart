@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/services/appointment_service.dart';
 import '../../core/services/user_service.dart';
+import '../../core/services/analytics_service.dart';
 import '../../core/errors/app_exception.dart';
 import '../../models/appointment_item.dart';
 import '../../models/availability_slot.dart';
@@ -16,6 +18,8 @@ class AppointmentProvider extends ChangeNotifier {
   List<AvailabilitySlot> _slots = [];
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<List<AppointmentItem>>? _appointmentsSub;
+  StreamSubscription<List<AvailabilitySlot>>? _slotsSub;
 
   List<AppointmentItem> get appointments => _appointments;
   List<AvailabilitySlot> get slots => _slots;
@@ -40,7 +44,7 @@ class AppointmentProvider extends ChangeNotifier {
       if (role == 'psychologist' || role == 'professional') {
         _appointments = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
       } else {
-        _appointments = await _appointmentService.getMyAppointmentsAsPatient(user.uid);
+        _appointments = await _appointment_service_getMyAppointmentsCached(user.uid);
       }
       _error = null;
     } catch (e) {
@@ -51,6 +55,11 @@ class AppointmentProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<List<AppointmentItem>> _appointment_service_getMyAppointmentsCached(String userId) async {
+    if (_appointments.isNotEmpty) return _appointments;
+    return await _appointmentService.getMyAppointmentsAsPatient(userId);
   }
 
   Future<void> loadMySlots() async {
@@ -85,6 +94,25 @@ class AppointmentProvider extends ChangeNotifier {
     // For streams, we can't easily get role async, so we'll use a StreamBuilder pattern
     // or return both streams merged. For now, default to patient stream and let UI handle.
     return _appointmentService.appointmentsStreamForPatient(user.uid);
+  }
+
+  void startAppointmentsListener() {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    _appointmentsSub?.cancel();
+    _appointmentsSub = _appointmentService.appointmentsStreamForPatient(user.uid).listen((list) {
+      _appointments = list;
+      notifyListeners();
+    }, onError: (e, st) {
+      final appException = mapToAppException(e, st);
+      _error = appException.message;
+      notifyListeners();
+    });
+  }
+
+  void stopAppointmentsListener() {
+    _appointmentsSub?.cancel();
+    _appointmentsSub = null;
   }
 
   Stream<List<AvailabilitySlot>> getMySlotsStream() {
@@ -144,6 +172,7 @@ class AppointmentProvider extends ChangeNotifier {
         slot: slot,
         modality: modality,
       );
+      await sl<AnalyticsService>().logAppointmentBooked(psychologistId: psychologistId);
       await loadMyAppointments();
     } catch (e) {
       final appException = mapToAppException(e);
@@ -155,6 +184,7 @@ class AppointmentProvider extends ChangeNotifier {
   Future<void> cancelAppointment(String appointmentId) async {
     try {
       await _appointmentService.cancelAppointment(appointmentId);
+      await sl<AnalyticsService>().logAppointmentCancelled(appointmentId: appointmentId);
       await loadMyAppointments();
     } catch (e) {
       final appException = mapToAppException(e);
@@ -187,5 +217,12 @@ class AppointmentProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _appointmentsSub?.cancel();
+    _slotsSub?.cancel();
+    super.dispose();
   }
 }

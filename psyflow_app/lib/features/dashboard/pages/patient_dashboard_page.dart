@@ -7,7 +7,7 @@ import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
-import '../../patient/enter_invite_page.dart';
+import '../../patients/presentation/pages/accept_link_page.dart';
 import '../../patient/espaco_psyflow_page.dart';
 import '../../tasks/patient_tasks_page.dart';
 import '../../mood/mood_page.dart';
@@ -92,7 +92,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           DrawerMenuItem(
             label: 'Meu Psicólogo',
             icon: Icons.psychology_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EnterInvitePage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AcceptLinkPage())),
           ),
           DrawerMenuItem(
             label: 'Minhas Tarefas',
@@ -100,8 +100,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientTasksPage())),
           ),
           DrawerMenuItem(
-            label: 'Mapa Emocional',
-            icon: Icons.favorite_rounded,
+            label: 'Meu Acompanhamento',
+            icon: Icons.spa_rounded,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MoodPage())),
           ),
           DrawerMenuItem(
@@ -299,7 +299,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 footerLabel: 'Ver vínculo',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const EnterInvitePage()),
+                                  MaterialPageRoute(builder: (_) => const AcceptLinkPage()),
                                 ),
                                 child: const PanelEmptyState(
                                   icon: Icons.psychology_outlined,
@@ -310,14 +310,14 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                             SizedBox(
                               width: (constraints.maxWidth - 16) / 2,
                               child: PanelCard(
-                                title: 'Mapa Emocional',
-                                footerLabel: 'Registrar humor',
+                                title: 'Meu Acompanhamento',
+                                footerLabel: 'Check-in diário',
                                 onFooterTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const MoodPage()),
                                 ),
                                 child: const PanelEmptyState(
-                                  icon: Icons.favorite_outline_rounded,
+                                  icon: Icons.spa_rounded,
                                   title: 'Como você está hoje?',
                                 ),
                               ),

@@ -23,14 +23,35 @@ service cloud.firestore {
                                       || request.auth.uid == request.resource.data.psychologist_id;
     }
 
-    // invites — psicólogo cria os próprios
+    // therapist_patient_links — novo sistema de vínculo
+    match /therapist_patient_links/{docId} {
+      // Psicólogo cria vínculo (status: pending, patientId: null)
+      allow create: if request.auth.uid == request.resource.data.psychologistId
+                      && request.resource.data.patientId == null
+                      && request.resource.data.status == 'pending';
+      // Psicólogo lê seus próprios vínculos; paciente lê o vínculo já aceito
+      allow read: if request.auth.uid == resource.data.psychologistId
+                    || request.auth.uid == resource.data.patientId;
+      // Paciente aceita um vínculo ainda sem dono (patientId == null, status == pending)
+      // FIX: a checagem original comparava request.auth.uid com resource.data.patientId,
+      // mas patientId ainda é null nesse momento — a condição nunca era satisfeita.
+      allow update: if (resource.data.patientId == null
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'active'
+                        && request.resource.data.patientId == request.auth.uid)
+                      || (request.auth.uid == resource.data.psychologistId
+                          && (request.resource.data.status == 'active'
+                              || request.resource.data.status == 'inactive'));
+    }
+
+    // invites — psicólogo cria os próprios (legado)
     match /invites/{docId} {
       allow create: if request.auth.uid == request.resource.data.psychologist_id;
       allow read: if request.auth != null;
       allow update: if request.auth != null; // paciente marca como usado
     }
 
-    // links — lido por ambas as partes
+    // links — lido por ambas as partes (legado)
     match /links/{docId} {
       allow read: if request.auth.uid == resource.data.psychologist_id
                   || request.auth.uid == resource.data.patient_id;
@@ -68,7 +89,7 @@ service cloud.firestore {
     // Logs e progresso — paciente escreve/lê os próprios
     match /emotional_logs/{docId} {
       allow read, write: if request.auth.uid == resource.data.patient_id
-                           || request.auth.uid == request.resource.data.patient_id;
+                         || request.auth.uid == request.resource.data.patient_id;
     }
 
     match /patient_intervention_progress/{docId} {
@@ -85,7 +106,7 @@ service cloud.firestore {
 
     // Helper: verifica se o psicólogo está vinculado ao paciente
     function isPsychologistOf(psychId, patientId) {
-      return exists(/databases/$(database)/documents/links/$(psychId + '_' + patientId));
+      return exists(/databases/$(database)/documents/therapist_patient_links/$(psychId + '_' + patientId));
       // Adapte conforme o formato de ID que usar nos links
     }
   }

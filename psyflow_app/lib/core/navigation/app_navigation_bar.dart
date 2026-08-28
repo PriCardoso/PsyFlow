@@ -4,7 +4,7 @@ import 'package:psyflow_app/features/patient/patient_tasks_page.dart';
 import 'package:psyflow_app/features/mood/mood_page.dart';
 import 'package:psyflow_app/features/appointments/book_appointment_page.dart';
 import 'package:psyflow_app/features/dashboard/pages/patient_dashboard_page.dart';
-import 'package:psyflow_app/features/psychologist/patients_page.dart';
+import 'package:psyflow_app/features/patients/presentation/pages/link_patient_page.dart';
 import 'package:psyflow_app/features/tasks/psychologist_tasks_page.dart';
 import 'package:psyflow_app/features/psychologist/manage_availability_page.dart';
 import 'package:psyflow_app/features/dashboard/pages/psychologist_dashboard_page.dart';
@@ -57,9 +57,9 @@ class _AppNavigationBarState extends State<AppNavigationBar> {
             label: 'Tarefas',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.favorite_outline),
-            selectedIcon: const Icon(Icons.favorite_rounded),
-            label: 'Humor',
+            icon: const Icon(Icons.spa_outlined),
+            selectedIcon: const Icon(Icons.spa_rounded),
+            label: 'Acompanhamento',
           ),
           NavigationDestination(
             icon: const Icon(Icons.person_outline_rounded),
@@ -229,7 +229,7 @@ class ProfessionalNavigationScaffold extends StatelessWidget {
       pageBuilder: (index) => [
         PsychologistDashboardPage(initialName: userName),
         ManageAvailabilityPage(),
-        PatientsPage(),
+        LinkPatientPage(),
         PsychologistTasksPage(),
         _ProfessionalProfilePage(),
       ],

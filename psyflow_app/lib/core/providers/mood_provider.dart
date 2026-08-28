@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/services/mood_service.dart';
+import '../../core/services/analytics_service.dart';
 import '../../core/errors/app_exception.dart';
 import '../../models/mood_model.dart';
 
@@ -82,6 +83,8 @@ class MoodProvider extends ChangeNotifier {
         energy: energy,
         notes: notes,
       );
+      // Log analytics
+      sl<AnalyticsService>().logMoodLogged(moodScore: mood).ignore();
       await loadMyEntries();
     } catch (e) {
       final appException = mapToAppException(e);

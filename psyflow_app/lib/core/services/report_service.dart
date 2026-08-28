@@ -1,6 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:printing/printing.dart';
 import 'package:psyflow_app/models/user_model.dart';
 import 'package:psyflow_app/models/mood_model.dart';
@@ -27,8 +28,8 @@ class ReportService {
   }) async {
     final pdf = pw.Document();
 
-    final font = await PdfGoogleFonts.robotoRegular();
-    final fontBold = await PdfGoogleFonts.robotoBold();
+    final font = pw.Font.helvetica();
+    final fontBold = pw.Font.helveticaBold();
 
     pdf.addPage(
       pw.MultiPage(
@@ -281,7 +282,7 @@ class ReportService {
                         height: 40 * percentage / 100,
                         width: 20,
                         decoration: pw.BoxDecoration(
-                          color: _getMoodColor(mood).withAlpha(200),
+                          color: _getMoodColor(mood).withAlpha(0.8),
                           borderRadius: pw.BorderRadius.circular(10),
                         ),
                       ),
@@ -312,7 +313,7 @@ class ReportService {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        color: color.withAlpha(30),
+        color: color.withAlpha(0.12),
         borderRadius: pw.BorderRadius.circular(8),
         border: pw.Border.all(color: color, width: 1),
       ),
@@ -490,7 +491,7 @@ class ReportService {
                   session.summary,
                   style: pw.TextStyle(font: font, fontSize: 10, color: PdfColor.fromHex('#444444')),
                   maxLines: 3,
-                  overflow: pw.TextOverflow.ellipsis,
+                  overflow: pw.TextOverflow.clip,
                 ),
               ],
               if (session.interventionsUsed.isNotEmpty) ...[
@@ -501,7 +502,7 @@ class ReportService {
                   children: session.interventionsUsed.map((i) => pw.Container(
                     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: pw.BoxDecoration(
-                      color: PdfColor.fromHex('#2C5E7A').withAlpha(30),
+                      color: PdfColor.fromHex('#2C5E7A').withAlpha(0.12),
                       borderRadius: pw.BorderRadius.circular(4),
                     ),
                     child: pw.Text(

@@ -61,6 +61,44 @@ class TaskModel {
     return DateTime.now().isAfter(dueDate!);
   }
 
+  TaskModel copyWith({
+    String? id,
+    String? patientId,
+    String? psychologistId,
+    String? title,
+    String? description,
+    String? category,
+    String? protocol,
+    int? difficulty,
+    DateTime? createdAt,
+    DateTime? dueDate,
+    DateTime? completedAt,
+    String? status,
+    String? response,
+    int? moodBefore,
+    int? moodAfter,
+    String? therapistNotes,
+  }) {
+    return TaskModel(
+      id: id ?? this.id,
+      patientId: patientId ?? this.patientId,
+      psychologistId: psychologistId ?? this.psychologistId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      protocol: protocol ?? this.protocol,
+      difficulty: difficulty ?? this.difficulty,
+      createdAt: createdAt ?? this.createdAt,
+      dueDate: dueDate ?? this.dueDate,
+      completedAt: completedAt ?? this.completedAt,
+      status: status ?? this.status,
+      response: response ?? this.response,
+      moodBefore: moodBefore ?? this.moodBefore,
+      moodAfter: moodAfter ?? this.moodAfter,
+      therapistNotes: therapistNotes ?? this.therapistNotes,
+    );
+  }
+
   factory TaskModel.fromMap(
       String id,
       Map<String, dynamic> map) {

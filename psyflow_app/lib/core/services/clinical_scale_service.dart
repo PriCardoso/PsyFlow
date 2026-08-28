@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/clinical_scale_model.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/utils/retry.dart';
 
 class ClinicalScaleService {
   final FirebaseFirestore _db;
@@ -100,16 +101,18 @@ class ClinicalScaleService {
     required String severityInterpretation,
   }) async {
     try {
-      await _db.collection('clinical_scale_responses').add({
-        'scale_id': scaleId,
-        'scale_code': scaleCode,
-        'patient_id': patientId,
-        'professional_id': professionalId,
-        'answers': answers.map((k, v) => MapEntry(k.toString(), v)),
-        'total_score': totalScore,
-        'severity_interpretation': severityInterpretation,
-        'completed_at': FieldValue.serverTimestamp(),
-      });
+      await retry(() async {
+        await _db.collection('clinical_scale_responses').add({
+          'scale_id': scaleId,
+          'scale_code': scaleCode,
+          'patient_id': patientId,
+          'professional_id': professionalId,
+          'answers': answers.map((k, v) => MapEntry(k.toString(), v)),
+          'total_score': totalScore,
+          'severity_interpretation': severityInterpretation,
+          'completed_at': FieldValue.serverTimestamp(),
+        });
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao enviar escala: $e', originalError: e);
     }
@@ -118,15 +121,17 @@ class ClinicalScaleService {
   /// Get scale responses for a patient
   Future<List<ClinicalScaleResponseModel>> getPatientScaleResponses(String patientId) async {
     try {
-      final snapshot = await _db
-          .collection('clinical_scale_responses')
-          .where('patient_id', isEqualTo: patientId)
-          .orderBy('completed_at', descending: true)
-          .get();
+      return await retry(() async {
+        final snapshot = await _db
+            .collection('clinical_scale_responses')
+            .where('patient_id', isEqualTo: patientId)
+            .orderBy('completed_at', descending: true)
+            .get();
 
-      return snapshot.docs
-          .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
-          .toList();
+        return snapshot.docs
+            .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
+            .toList();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar respostas: $e', originalError: e);
     }
@@ -135,15 +140,17 @@ class ClinicalScaleService {
   /// Get scale responses for a professional's patients
   Future<List<ClinicalScaleResponseModel>> getProfessionalScaleResponses(String professionalId) async {
     try {
-      final snapshot = await _db
-          .collection('clinical_scale_responses')
-          .where('professional_id', isEqualTo: professionalId)
-          .orderBy('completed_at', descending: true)
-          .get();
+      return await retry(() async {
+        final snapshot = await _db
+            .collection('clinical_scale_responses')
+            .where('professional_id', isEqualTo: professionalId)
+            .orderBy('completed_at', descending: true)
+            .get();
 
-      return snapshot.docs
-          .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
-          .toList();
+        return snapshot.docs
+            .map((doc) => ClinicalScaleResponseModel.fromMap({'id': doc.id, ...doc.data()}))
+            .toList();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar respostas: $e', originalError: e);
     }
@@ -155,16 +162,18 @@ class ClinicalScaleService {
     required String scaleCode,
   }) async {
     try {
-      final snapshot = await _db
-          .collection('clinical_scale_responses')
-          .where('patient_id', isEqualTo: patientId)
-          .where('scale_code', isEqualTo: scaleCode)
-          .orderBy('completed_at', descending: true)
-          .limit(1)
-          .get();
+      return await retry(() async {
+        final snapshot = await _db
+            .collection('clinical_scale_responses')
+            .where('patient_id', isEqualTo: patientId)
+            .where('scale_code', isEqualTo: scaleCode)
+            .orderBy('completed_at', descending: true)
+            .limit(1)
+            .get();
 
-      if (snapshot.docs.isEmpty) return null;
-      return ClinicalScaleResponseModel.fromMap({'id': snapshot.docs.first.id, ...snapshot.docs.first.data()});
+        if (snapshot.docs.isEmpty) return null;
+        return ClinicalScaleResponseModel.fromMap({'id': snapshot.docs.first.id, ...snapshot.docs.first.data()});
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar resposta: $e', originalError: e);
     }

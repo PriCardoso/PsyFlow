@@ -199,4 +199,68 @@ class InviteService {
       throw AppException('Erro ao buscar psicólogo: $e', originalError: e);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Ficha de Avaliação Inicial Pré-Consulta
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /// Paciente envia a ficha inicial pré-consulta
+  Future<void> submitInitialAssessment({
+    required String psychologistId,
+    required String mainComplaint,
+    required String symptomsDuration,
+    required bool previousTherapy,
+    String? previousTherapyDetails,
+    required bool usingMedication,
+    String? medicationDetails,
+    required String mainGoal,
+    int distressLevel = 5,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw AppException('Usuário não autenticado.');
+
+    try {
+      await _db.collection('initial_assessments').doc(user.uid).set({
+        'patient_id': user.uid,
+        'psychologist_id': psychologistId,
+        'main_complaint': mainComplaint,
+        'symptoms_duration': symptomsDuration,
+        'previous_therapy': previousTherapy,
+        'previous_therapy_details': previousTherapyDetails,
+        'using_medication': usingMedication,
+        'medication_details': medicationDetails,
+        'main_goal': mainGoal,
+        'distress_level': distressLevel,
+        'created_at': FieldValue.serverTimestamp(),
+        'is_completed': true,
+      });
+    } catch (e) {
+      throw AppException('Erro ao salvar ficha de avaliação inicial: $e', originalError: e);
+    }
+  }
+
+  /// Busca a avaliação inicial do paciente logado
+  Future<Map<String, dynamic>?> getMyInitialAssessment() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final doc = await _db.collection('initial_assessments').doc(user.uid).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return {'id': doc.id, ...doc.data()!};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Psicólogo busca a avaliação inicial de um paciente vinculado
+  Future<Map<String, dynamic>?> getPatientInitialAssessment(String patientId) async {
+    try {
+      final doc = await _db.collection('initial_assessments').doc(patientId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return {'id': doc.id, ...doc.data()!};
+    } catch (_) {
+      return null;
+    }
+  }
 }

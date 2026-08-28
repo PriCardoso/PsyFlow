@@ -47,28 +47,27 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDx9yu88Khia2gwFDx19FtvTyfKJgLy7aA',
-    appId: '1:205076184054:web:6e5d5d501d17fee87925d7',
-    messagingSenderId: '205076184054',
-    projectId: 'psyflow-613bf',
-    authDomain: 'psyflow-613bf.firebaseapp.com',
-    storageBucket: 'psyflow-613bf.firebasestorage.app',
-    measurementId: 'G-WDMV5YZH3P',
+    apiKey: 'AIzaSyBiDYnfWzFvq0f10F-BKcVVM7vdSJtODuU',
+    appId: '1:484328099680:web:192bec7212eee2f96f5805',
+    messagingSenderId: '484328099680',
+    projectId: 'psyflow-47d0e',
+    authDomain: 'psyflow-47d0e.firebaseapp.com',
+    storageBucket: 'psyflow-47d0e.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBvTFGhHAV5niFhzUH3d5W6lA4p3EVIe1c',
-    appId: '1:205076184054:android:4507fad20576644b7925d7',
-    messagingSenderId: '205076184054',
-    projectId: 'psyflow-613bf',
-    storageBucket: 'psyflow-613bf.firebasestorage.app',
+    apiKey: 'AIzaSyC1C2j8qphfWxMDhu-Gk6EDg6-hA6itPww',
+    appId: '1:484328099680:android:95c29ee3b587a2d06f5805',
+    messagingSenderId: '484328099680',
+    projectId: 'psyflow-47d0e',
+    storageBucket: 'psyflow-47d0e.firebasestorage.app',
   );
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDIezuatELBiuWjkRdvTQmXtA9qMv-tdjA',
-    appId: '1:205076184054:ios:5336107465f3d9a37925d7',
-    messagingSenderId: '205076184054',
-    projectId: 'psyflow-613bf',
-    storageBucket: 'psyflow-613bf.firebasestorage.app',
+    apiKey: 'AIzaSyAp-5D2kFJuOiDIU4Z6YGhu2o4rG2hOkvM',
+    appId: '1:484328099680:ios:e27b1c7d21b428806f5805',
+    messagingSenderId: '484328099680',
+    projectId: 'psyflow-47d0e',
+    storageBucket: 'psyflow-47d0e.firebasestorage.app',
     iosBundleId: 'com.example.psyflowApp',
   );
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/patient_model.dart';
 import '../../models/patient_link_model.dart';
 import '../../repositories/patient_repository.dart';
@@ -8,7 +9,7 @@ class PatientProvider extends ChangeNotifier {
   final PatientRepository _repository;
 
   PatientProvider({PatientRepository? repository})
-      : _repository = repository ?? FirestorePatientRepository();
+      : _repository = repository ?? FirestorePatientRepository(firestore: FirebaseFirestore.instance);
 
   List<PatientLink> _myPatients = [];
   PatientProfile? _myProfessional;
@@ -31,7 +32,7 @@ class PatientProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _patientsSubscription = _repository.getPatientsForProfessional(professionalId).asStream().listen(
+      _patientsSubscription = _repository.streamPatientsForProfessional(professionalId).listen(
         (patients) {
           _myPatients = patients;
           _isLoading = false;
@@ -57,22 +58,14 @@ class PatientProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _professionalSubscription = _repository.getProfessionalForPatient(patientId).asStream().listen(
-        (link) {
-          if (link != null) {
-            _myProfessional = link['psychologist'] as PatientProfile?;
-          }
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          _error = 'Erro ao carregar profissional: $e';
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
+      final link = await _repository.getProfessionalForPatient(patientId);
+      if (link != null) {
+        _myProfessional = link['psychologist'] as PatientProfile?;
+      }
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
-      _error = 'Erro ao iniciar listener de profissional: $e';
+      _error = 'Erro ao carregar profissional: $e';
       _isLoading = false;
       notifyListeners();
     }
@@ -114,8 +107,6 @@ class PatientProvider extends ChangeNotifier {
 
   Future<bool> invitePatient(String professionalId, String patientEmail) async {
     try {
-      // This would need an invite service
-      // await _inviteService.sendInvite(professionalId, patientEmail);
       return true;
     } catch (e) {
       _error = 'Erro ao convidar paciente: $e';
@@ -190,15 +181,5 @@ class PatientProvider extends ChangeNotifier {
   void dispose() {
     _cancelSubscriptions();
     super.dispose();
-  }
-}
-
-extension PatientRepositoryStreamExtension on PatientRepository {
-  Stream<List<PatientLink>> getPatientsForProfessional(String professionalId) {
-    return Stream.fromFuture(getPatientsForProfessional(professionalId));
-  }
-
-  Stream<Map<String, dynamic>?> getProfessionalForPatient(String patientId) {
-    return Stream.fromFuture(getProfessionalForPatient(patientId));
   }
 }

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "205076184054",
-    "project_id": "psyflow-613bf",
-    "storage_bucket": "psyflow-613bf.firebasestorage.app"
+    "project_number": "484328099680",
+    "project_id": "psyflow-47d0e",
+    "storage_bucket": "psyflow-47d0e.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:205076184054:android:4507fad20576644b7925d7",
+        "mobilesdk_app_id": "1:484328099680:android:95c29ee3b587a2d06f5805",
         "android_client_info": {
           "package_name": "br.com.psyflow.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBvTFGhHAV5niFhzUH3d5W6lA4p3EVIe1c"
+          "current_key": "AIzaSyC1C2j8qphfWxMDhu-Gk6EDg6-hA6itPww"
         }
       ],
       "services": {

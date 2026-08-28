@@ -14,6 +14,7 @@ import '../../core/services/task_service.dart';
 import '../../core/services/appointment_service.dart';
 import '../../core/services/mood_service.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/services/therapist_patient_service.dart';
 import '../../core/services/protocol_service.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/notification_service.dart';
@@ -22,6 +23,16 @@ import '../../core/services/clinical_scale_service.dart';
 import '../../core/services/emotional_log_service.dart';
 import '../../core/services/intervention_service.dart';
 import '../../core/services/other_services.dart';
+import '../../core/services/analytics_service.dart';
+import '../../core/services/data_export_service.dart';
+import '../providers/user_provider.dart';
+import '../providers/task_provider.dart';
+import '../providers/appointment_provider.dart';
+import '../providers/mood_provider.dart';
+import '../providers/invite_provider.dart';
+import '../providers/locale_provider.dart';
+import '../providers/patient_provider.dart';
+import '../providers/chat_provider.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -85,6 +96,12 @@ void _registerServices() {
       auth: sl<FirebaseAuth>(),
     ),
   );
+  sl.registerLazySingleton<TherapistPatientService>(
+    () => TherapistPatientService(
+      firestore: sl<FirebaseFirestore>(),
+      auth: sl<FirebaseAuth>(),
+    ),
+  );
   sl.registerLazySingleton<ProtocolService>(
     () => ProtocolService(firestore: sl<FirebaseFirestore>()),
   );
@@ -119,4 +136,22 @@ void _registerServices() {
   sl.registerLazySingleton<ReportService>(
     () => ReportService(firestore: sl<FirebaseFirestore>()),
   );
+  sl.registerLazySingleton<DataExportService>(
+    () => DataExportService(firestore: sl<FirebaseFirestore>()),
+  );
+  sl.registerLazySingleton<AnalyticsService>(
+    () => AnalyticsService(),
+  );
+
+  // Providers
+  sl.registerLazySingleton<UserProvider>(() => UserProvider());
+  sl.registerLazySingleton<TaskProvider>(() => TaskProvider());
+  sl.registerLazySingleton<AppointmentProvider>(() => AppointmentProvider());
+  sl.registerLazySingleton<MoodProvider>(() => MoodProvider());
+  sl.registerLazySingleton<InviteProvider>(() => InviteProvider());
+  sl.registerLazySingleton<LocaleProvider>(() => LocaleProvider());
+  sl.registerLazySingleton<PatientProvider>(
+    () => PatientProvider(repository: sl<PatientRepository>()),
+  );
+  sl.registerLazySingleton<ChatProvider>(() => ChatProvider());
 }

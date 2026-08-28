@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../repositories/chat_repository.dart';
-import '../models/chat_message_model.dart';
+import '../../repositories/chat_repository.dart';
+import '../../models/chat_message_model.dart';
 
 class ChatService {
   final ChatRepository _repository;
@@ -12,9 +12,9 @@ class ChatService {
     ChatRepository? repository,
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
-  })  : _repository = repository ?? FirestoreChatRepository(),
-        _db = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  })  : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance,
+        _repository = repository ?? FirestoreChatRepository(firestore: firestore ?? FirebaseFirestore.instance);
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 

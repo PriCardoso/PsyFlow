@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/auth_error_translator.dart';
+import '../../../../core/services/analytics_service.dart';
+import '../../../../core/di/service_locator.dart';
 import '../auth_gate.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
@@ -30,6 +34,11 @@ class _LoginPageState extends State<LoginPage> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+
+      // Log analytics
+      unawaited(sl<AnalyticsService>().logLogin());
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) unawaited(sl<AnalyticsService>().setUserId(uid));
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(

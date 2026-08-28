@@ -4,6 +4,7 @@ import 'dart:async';
 import '../../models/task_item.dart';
 import '../../core/errors/app_exception.dart';
 import '../../repositories/task_repository.dart';
+import '../../core/utils/retry.dart';
 
 class TaskService {
   final FirebaseFirestore _db;
@@ -56,23 +57,25 @@ class TaskService {
     if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
-      await _db.collection('tasks').add({
-        'psychologist_id': user.uid,
-        'patient_id': patientId,
-        'title': title,
-        'description': description,
-        'category': category ?? 'geral',
-        'protocol': protocol ?? '',
-        'difficulty_level': difficultyLevel,
-        'status': 'pending',
-        'due_date': dueDate != null ? Timestamp.fromDate(dueDate) : null,
-        'created_at': FieldValue.serverTimestamp(),
-        'completed_at': null,
-        'patient_response': null,
-        'therapist_notes': null,
-        'mood_before': null,
-        'mood_after': null,
-      });
+      await retry(() async {
+        await _db.collection('tasks').add({
+          'psychologist_id': user.uid,
+          'patient_id': patientId,
+          'title': title,
+          'description': description,
+          'category': category ?? 'geral',
+          'protocol': protocol ?? '',
+          'difficulty_level': difficultyLevel,
+          'status': 'pending',
+          'due_date': dueDate != null ? Timestamp.fromDate(dueDate) : null,
+          'created_at': FieldValue.serverTimestamp(),
+          'completed_at': null,
+          'patient_response': null,
+          'therapist_notes': null,
+          'mood_before': null,
+          'mood_after': null,
+        });
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao criar tarefa: $e', originalError: e);
     }
@@ -84,27 +87,30 @@ class TaskService {
     if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
-      final snap = await _db
-          .collection('tasks')
-          .where('psychologist_id', isEqualTo: user.uid)
-          .orderBy('due_date')
-          .get();
+      return await retry(() async {
+        final snap = await _db
+            .collection('tasks')
+            .where('psychologist_id', isEqualTo: user.uid)
+            .orderBy('due_date')
+            .get();
 
-      final tasks = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
-      final patientIds = tasks.map((t) => t['patient_id'] as String).toSet();
+        final tasks = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+        final patientIds = tasks.map((t) => t['patient_id'] as String).toSet();
 
-      final patientNames = <String, String>{};
-      for (final pid in patientIds) {
-        final doc = await _db.collection('users').doc(pid).get();
-        if (doc.exists) {
-          patientNames[pid] = doc.data()?['full_name'] ?? doc.data()?['fullName'] ?? '';
+        final patientNames = <String, String>{};
+        for (final pid in patientIds) {
+          final doc = await _db.collection('users').doc(pid).get();
+          if (doc.exists) {
+            final data = doc.data()!;
+            patientNames[pid] = (data['full_name'] ?? data['fullName'] ?? '') as String;
+          }
         }
-      }
 
-      return tasks.map((t) {
-        final pid = t['patient_id'] as String;
-        return TaskItem.fromMap({...t, 'patient_name': patientNames[pid]});
-      }).toList();
+        return tasks.map((t) {
+          final pid = t['patient_id'] as String;
+          return TaskItem.fromMap({...t, 'patient_name': patientNames[pid]});
+        }).toList();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
@@ -116,16 +122,18 @@ class TaskService {
     if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
-      final snap = await _db
-          .collection('tasks')
-          .where('psychologist_id', isEqualTo: user.uid)
-          .where('patient_id', isEqualTo: patientId)
-          .orderBy('due_date')
-          .get();
+      return await retry(() async {
+        final snap = await _db
+            .collection('tasks')
+            .where('psychologist_id', isEqualTo: user.uid)
+            .where('patient_id', isEqualTo: patientId)
+            .orderBy('due_date')
+            .get();
 
-      return snap.docs
-          .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
-          .toList();
+        return snap.docs
+            .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
+            .toList();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
@@ -137,15 +145,17 @@ class TaskService {
     if (user == null) throw AppException('Usuário não autenticado.');
 
     try {
-      final snap = await _db
-          .collection('tasks')
-          .where('patient_id', isEqualTo: user.uid)
-          .orderBy('due_date')
-          .get();
+      return await retry(() async {
+        final snap = await _db
+            .collection('tasks')
+            .where('patient_id', isEqualTo: user.uid)
+            .orderBy('due_date')
+            .get();
 
-      return snap.docs
-          .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
-          .toList();
+        return snap.docs
+            .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
+            .toList();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
@@ -159,13 +169,15 @@ class TaskService {
     required int moodAfter,
   }) async {
     try {
-      await _db.collection('tasks').doc(taskId).update({
-        'status': 'completed',
-        'completed_at': FieldValue.serverTimestamp(),
-        'patient_response': response,
-        'mood_before': moodBefore,
-        'mood_after': moodAfter,
-      });
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).update({
+          'status': 'completed',
+          'completed_at': FieldValue.serverTimestamp(),
+          'patient_response': response,
+          'mood_before': moodBefore,
+          'mood_after': moodAfter,
+        });
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao concluir tarefa: $e', originalError: e);
     }
@@ -174,10 +186,12 @@ class TaskService {
   /// Paciente marca tarefa como concluída/pendente
   Future<void> toggleTaskStatus(String taskId, bool completed) async {
     try {
-      await _db.collection('tasks').doc(taskId).update({
-        'status': completed ? 'completed' : 'pending',
-        'completed_at': completed ? FieldValue.serverTimestamp() : null,
-      });
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).update({
+          'status': completed ? 'completed' : 'pending',
+          'completed_at': completed ? FieldValue.serverTimestamp() : null,
+        });
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao atualizar tarefa: $e', originalError: e);
     }
@@ -186,7 +200,9 @@ class TaskService {
   /// Psicólogo exclui uma tarefa
   Future<void> deleteTask(String taskId) async {
     try {
-      await _db.collection('tasks').doc(taskId).delete();
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).delete();
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao excluir tarefa: $e', originalError: e);
     }
@@ -198,9 +214,11 @@ class TaskService {
     required String notes,
   }) async {
     try {
-      await _db.collection('tasks').doc(taskId).update({
-        'therapist_notes': notes,
-      });
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).update({
+          'therapist_notes': notes,
+        });
+      }, retries: 3, initialDelay: Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao salvar anotação: $e', originalError: e);
     }

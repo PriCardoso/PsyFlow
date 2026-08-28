@@ -1,17 +1,19 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/services/task_service.dart';
+import '../../core/services/analytics_service.dart';
 import '../../core/errors/app_exception.dart';
 import '../../models/task_item.dart';
 
 class TaskProvider extends ChangeNotifier {
   final TaskService _taskService = sl<TaskService>();
   final FirebaseAuth _auth = sl<FirebaseAuth>();
-
   List<TaskItem> _tasks = [];
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<List<TaskItem>>? _tasksSubscription;
 
   List<TaskItem> get tasks => _tasks;
   bool get isLoading => _isLoading;
@@ -30,6 +32,12 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Use cached tasks when available to avoid unnecessary refetches
+      if (_tasks.isNotEmpty) {
+        _error = null;
+        return;
+      }
+
       _tasks = await _taskService.getMyTasks();
       _error = null;
     } catch (e) {
@@ -40,6 +48,25 @@ class TaskProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void startMyTasksListener() {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    _tasksSubscription?.cancel();
+    _tasksSubscription = _taskService.tasksStreamForPatient(user.uid).listen((list) {
+      _tasks = list;
+      notifyListeners();
+    }, onError: (e, st) {
+      final appException = mapToAppException(e, st);
+      _error = appException.message;
+      notifyListeners();
+    });
+  }
+
+  void stopMyTasksListener() {
+    _tasksSubscription?.cancel();
+    _tasksSubscription = null;
   }
 
   Future<void> loadTasksForPatient(String patientId) async {
@@ -121,6 +148,7 @@ class TaskProvider extends ChangeNotifier {
         difficultyLevel: difficultyLevel,
         dueDate: dueDate,
       );
+      sl<AnalyticsService>().logTaskCreated(patientId: patientId).ignore();
       await loadTasksCreatedByMe();
     } catch (e) {
       final appException = mapToAppException(e);
@@ -142,6 +170,7 @@ class TaskProvider extends ChangeNotifier {
         moodBefore: moodBefore,
         moodAfter: moodAfter,
       );
+      sl<AnalyticsService>().logTaskCompleted(taskId: taskId).ignore();
       await loadMyTasks();
     } catch (e) {
       final appException = mapToAppException(e);
@@ -188,5 +217,11 @@ class TaskProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _tasksSubscription?.cancel();
+    super.dispose();
   }
 }

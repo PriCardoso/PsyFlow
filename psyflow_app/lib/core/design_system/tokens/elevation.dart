@@ -32,7 +32,7 @@ class AppElevation {
   }) {
     switch (elevation) {
       case level0:
-        return BoxShadow.none;
+        return const BoxShadow(color: Colors.transparent);
       case level1:
         return BoxShadow(
           color: color.withOpacity(0.1),

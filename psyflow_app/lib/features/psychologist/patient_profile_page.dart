@@ -5,6 +5,7 @@ import '../../core/di/service_locator.dart';
 import '../../models/patient_link_model.dart';
 import '../mood/patient_mood_history_page.dart';
 import '../tasks/psychologist_tasks_page.dart';
+import 'patient_insights_dashboard_page.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final PatientLink link;
@@ -24,11 +25,28 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   final _service = sl<InviteService>();
   bool _loading = false;
   late bool _isActive;
+  Map<String, dynamic>? _initialAssessment;
+  bool _loadingAssessment = true;
 
   @override
   void initState() {
     super.initState();
     _isActive = widget.link.active;
+    _loadInitialAssessment();
+  }
+
+  Future<void> _loadInitialAssessment() async {
+    try {
+      final assessment = await _service.getPatientInitialAssessment(widget.link.patient.id);
+      if (mounted) {
+        setState(() {
+          _initialAssessment = assessment;
+          _loadingAssessment = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAssessment = false);
+    }
   }
 
   Future<void> _toggleLink() async {
@@ -277,21 +295,124 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                   ),
                 ],
 
+                // ── Ficha de Avaliação Inicial Pré-Consulta ────
+                const SizedBox(height: 24),
+                const _SectionTitle(title: 'Ficha Inicial Pré-Consulta'),
+                const SizedBox(height: 12),
+                if (_loadingAssessment)
+                  const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
+                else if (_initialAssessment != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF0D9488), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Respondida pelo Paciente',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary),
+                                  ),
+                                  Text(
+                                    'Dados coletados antes da 1ª consulta',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF0D9488),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              ),
+                              onPressed: () => _showAssessmentDetailsSheet(context, _initialAssessment!),
+                              icon: const Icon(Icons.visibility_outlined, size: 16),
+                              label: const Text('Ver respostas', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        if (_initialAssessment!['main_complaint'] != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Queixa: "${_initialAssessment!['main_complaint']}"',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontStyle: FontStyle.italic),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.hourglass_top_rounded, color: AppColors.textSecondary, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Aguardando preenchimento da ficha inicial pelo paciente no app.',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // ── Acompanhamento ────────────────────────────
                 const SizedBox(height: 24),
-                const _SectionTitle(title: 'Acompanhamento'),
+                const _SectionTitle(title: 'Acompanhamento & Insights'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: _QuickActionButton(
-                        icon: Icons.favorite_rounded,
-                        label: 'Mapa Emocional',
-                        color: AppColors.cardRed,
+                        icon: Icons.insights_rounded,
+                        label: 'PsyFlow Insights & Acompanhamento',
+                        color: const Color(0xFF6366F1),
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PatientMoodHistoryPage(
+                            builder: (_) => PatientInsightsDashboardPage(
                               patientId: patient.id,
                               patientName: patient.fullName,
                             ),
@@ -509,4 +630,134 @@ class _Divider extends StatelessWidget {
           color: AppColors.textSecondary.withValues(alpha: 0.12),
         ),
       );
+}
+
+void _showAssessmentDetailsSheet(BuildContext context, Map<String, dynamic> data) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ficha Inicial Pré-Consulta',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Respostas enviadas pelo paciente',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildQuestionAnswer(
+                    '1. Queixa principal / Motivação:',
+                    data['main_complaint'] ?? 'Não informado',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionAnswer(
+                    '2. Duração dos sintomas:',
+                    data['symptoms_duration'] ?? 'Não informado',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionAnswer(
+                    '3. Psicoterapia anterior:',
+                    (data['previous_therapy'] == true)
+                        ? 'Sim${data['previous_therapy_details'] != null ? ' - ${data['previous_therapy_details']}' : ''}'
+                        : 'Não',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionAnswer(
+                    '4. Uso de medicação contínua/psiquiátrica:',
+                    (data['using_medication'] == true)
+                        ? 'Sim${data['medication_details'] != null ? ' - ${data['medication_details']}' : ''}'
+                        : 'Não',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionAnswer(
+                    '5. Principal objetivo com a terapia:',
+                    data['main_goal'] ?? 'Não informado',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionAnswer(
+                    '6. Nível de incômodo / sofrimento inicial:',
+                    '${data['distress_level'] ?? 5}/10',
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildQuestionAnswer(String question, String answer) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        question,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+      ),
+      const SizedBox(height: 6),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          answer,
+          style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
+        ),
+      ),
+    ],
+  );
 }
