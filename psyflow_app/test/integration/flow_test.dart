@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:psyflow_app/core/services/invite_service.dart';
+import 'package:psyflow_app/core/services/therapist_patient_service.dart';
 import 'package:psyflow_app/core/services/task_service.dart';
 import 'package:psyflow_app/core/services/mood_service.dart';
 import 'package:psyflow_app/repositories/task_repository.dart';
@@ -16,7 +16,7 @@ void main() {
     late FakeFirebaseFirestore fakeFirestore;
     late MockFirebaseAuth mockAuth;
     late MockUser mockUser;
-    late InviteService inviteService;
+    late TherapistPatientService linkService;
     late TaskService taskService;
     late MoodService moodService;
     late PatientRepository patientRepository;
@@ -32,7 +32,7 @@ void main() {
       when(() => mockUser.uid).thenReturn(psychUid);
       when(() => mockAuth.currentUser).thenReturn(mockUser);
 
-      inviteService = InviteService(firestore: fakeFirestore, auth: mockAuth);
+      linkService = TherapistPatientService(firestore: fakeFirestore, auth: mockAuth);
       final taskRepo = FirestoreTaskRepository(firestore: fakeFirestore);
       taskService = TaskService(
         firestore: fakeFirestore,
@@ -59,12 +59,19 @@ void main() {
 
       // 2. Psychologist creates invitation
       when(() => mockUser.uid).thenReturn(psychUid);
-      final inviteCode = await inviteService.generateInvite();
+      final inviteCode = await linkService.generateInviteCode();
       expect(inviteCode, isNotEmpty);
 
       // 3. Patient uses invitation code to link with psychologist
       when(() => mockUser.uid).thenReturn(patientUid);
-      await inviteService.useInvite(inviteCode);
+      await linkService.acceptInviteCode(inviteCode);
+
+      final canonicalLink = await fakeFirestore
+          .collection('therapist_patient_links')
+          .doc('${psychUid}_$patientUid')
+          .get();
+      expect(canonicalLink.exists, isTrue);
+      expect(canonicalLink.data()?['status'], 'active');
 
       // Verify link in PatientRepository
       final patientLink = await patientRepository.getProfessionalForPatient(patientUid);

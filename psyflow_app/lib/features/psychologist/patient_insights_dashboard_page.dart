@@ -6,6 +6,9 @@ import '../../core/di/service_locator.dart';
 import '../../models/mood_model.dart';
 import '../../models/task_item.dart';
 import '../../models/assessment_template_model.dart';
+import '../../models/thought_record_model.dart';
+import '../../core/services/thought_record_service.dart';
+import '../mood/thought_record_details_dialog.dart';
 import 'clinical_report_generator_dialog.dart';
 
 class PatientInsightsDashboardPage extends StatefulWidget {
@@ -25,11 +28,14 @@ class PatientInsightsDashboardPage extends StatefulWidget {
 class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardPage> {
   final _moodService = sl<MoodService>();
   final _taskService = sl<TaskService>();
+  final _thoughtService = sl<ThoughtRecordService>();
 
   List<MoodEntry> _entries = [];
   List<TaskItem> _patientTasks = [];
+  List<ThoughtRecordEntry> _thoughtRecords = [];
   bool _loading = true;
   int _selectedDaysPeriod = 7; // 7, 30, 90
+  int _currentDashboardTab = 0; // 0: Humor & Fisiologia, 1: TCC & RPDs (Cogni)
 
   // Toggles de visualização no gráfico
   bool _showMood = true;
@@ -53,16 +59,19 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
         since: sinceDate,
       );
 
-      // Carregar tarefas para cruzamento de dados
+      // Carregar tarefas e RPDs para cruzamento de dados
       List<TaskItem> tasks = [];
+      List<ThoughtRecordEntry> rpds = [];
       try {
         tasks = await _taskService.getTasksForPatient(widget.patientId);
+        rpds = await _thoughtService.getPatientThoughtRecords(widget.patientId);
       } catch (_) {}
 
       if (mounted) {
         setState(() {
           _entries = entries;
           _patientTasks = tasks;
+          _thoughtRecords = rpds;
           _loading = false;
         });
       }
@@ -338,53 +347,162 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
             ),
           ),
 
-          // ── Conteúdo do Dashboard ─────────────────────────────────────────
+          // ── Abas de Visualização (Humor vs TCC Cogni) ───────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filtro de Período
-                  _buildPeriodSelector(),
-                  const SizedBox(height: 20),
-
-                  // Cards de Médias do Período
-                  _buildMetricsGrid(averages, weeklyTrend),
-                  const SizedBox(height: 24),
-
-                  // Gráfico de Evolução Temporal
-                  _buildEvolutionChartSection(),
-                  const SizedBox(height: 24),
-
-                  // Cruzamento de Dados & Observações Clínicas
-                  _buildCrossAnalysisSection(observations),
-                  const SizedBox(height: 24),
-
-                  // Resumo da Semana & Pontos de Atenção
-                  _buildAttentionPointsSection(weeklyTrend),
-                  const SizedBox(height: 24),
-
-                  // Botão de Gerar Relatório em Destaque
-                  _buildReportActionCard(),
-                  const SizedBox(height: 28),
-
-                  // Histórico de Registros
-                  const Text(
-                    'Registros Individuais no Período',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _currentDashboardTab = 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _currentDashboardTab == 0 ? AppColors.psychologist : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.show_chart_rounded, size: 18, color: _currentDashboardTab == 0 ? Colors.white : AppColors.textSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Humor & Fisiologia',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: _currentDashboardTab == 0 ? Colors.white : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _currentDashboardTab = 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _currentDashboardTab == 1 ? const Color(0xFF6366F1) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.psychology_alt_rounded, size: 18, color: _currentDashboardTab == 1 ? Colors.white : AppColors.textSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'TCC & RPDs (Cogni)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: _currentDashboardTab == 1 ? Colors.white : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Lista de Registros Recentes
+          // ── Conteúdo da Aba 0 (Humor) ou Aba 1 (TCC Cogni) ─────────────────
+          if (_currentDashboardTab == 0) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Filtro de Período
+                    _buildPeriodSelector(),
+                    const SizedBox(height: 20),
+
+                    // Cards de Médias do Período
+                    _buildMetricsGrid(averages, weeklyTrend),
+                    const SizedBox(height: 24),
+
+                    // Gráfico de Evolução Temporal
+                    _buildEvolutionChartSection(),
+                    const SizedBox(height: 24),
+
+                    // Cruzamento de Dados & Observações Clínicas
+                    _buildCrossAnalysisSection(observations),
+                    const SizedBox(height: 24),
+
+                    // Resumo da Semana & Pontos de Atenção
+                    _buildAttentionPointsSection(weeklyTrend),
+                    const SizedBox(height: 24),
+
+                    // Botão de Gerar Relatório em Destaque
+                    _buildReportActionCard(),
+                    const SizedBox(height: 28),
+
+                    // Histórico de Registros
+                    const Text(
+                      'Registros Individuais de Humor no Período',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCogniOverviewSection(),
+                    const SizedBox(height: 24),
+                    _buildCognitiveDistortionsChartSection(),
+                    const SizedBox(height: 24),
+                    _buildTriggersMatrixSection(),
+                    const SizedBox(height: 28),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Feed de Registros de Pensamentos (RPD)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          '${_thoughtRecords.length} RPD(s)',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6366F1)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Lista de Registros Recentes (Aba 0: Humor, Aba 1: RPDs)
           if (_loading)
             const SliverFillRemaining(
               hasScrollBody: false,
@@ -392,42 +510,81 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
                 child: CircularProgressIndicator(color: AppColors.psychologist),
               ),
             )
-          else if (_entries.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(Icons.hourglass_empty_rounded, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Nenhum registro encontrado no período',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Tente selecionar um período mais amplo acima.',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      ),
-                    ],
+          else if (_currentDashboardTab == 0) ...[
+            if (_entries.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.hourglass_empty_rounded, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Nenhum registro de humor encontrado no período',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Tente selecionar um período mais amplo acima.',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final entry = _entries[index];
+                      return _buildEntryItemCard(entry);
+                    },
+                    childCount: _entries.length,
                   ),
                 ),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final entry = _entries[index];
-                    return _buildEntryItemCard(entry);
-                  },
-                  childCount: _entries.length,
+          ] else ...[
+            if (_thoughtRecords.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.psychology_outlined, size: 44, color: const Color(0xFF6366F1).withValues(alpha: 0.5)),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Nenhum RPD registrado pelo paciente ainda',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Os registros de pensamentos disfuncionais e distorções aparecerão aqui.',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final rpd = _thoughtRecords[index];
+                      return _buildPsychologistRpdItemCard(rpd);
+                    },
+                    childCount: _thoughtRecords.length,
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
       ),
     );
@@ -1045,7 +1202,462 @@ class _PatientInsightsDashboardPageState extends State<PatientInsightsDashboardP
       ),
     );
   }
+
+  // ── MÉTODOS DE ANÁLISE TCC & COGNI PARA O PSICÓLOGO ───────────────────────────
+
+  Widget _buildCogniOverviewSection() {
+    final avgRelief = _thoughtService.getAverageEmotionReduction(_thoughtRecords);
+    final distortionsMap = _thoughtService.getDistortionDistribution(_thoughtRecords);
+    final topTriggers = _thoughtService.getTopTriggers(_thoughtRecords);
+
+    String topDistortionName = 'Nenhuma ainda';
+    if (distortionsMap.isNotEmpty) {
+      final sorted = distortionsMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final info = CognitiveDistortionCatalog.findById(sorted.first.key);
+      topDistortionName = info?.shortName ?? sorted.first.key;
+    }
+
+    String topTriggerName = 'Variados';
+    if (topTriggers.isNotEmpty) {
+      final sortedTriggers = topTriggers.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      topTriggerName = sortedTriggers.first.key;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.psychology_rounded, color: Color(0xFF6366F1), size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Painel Cognitivo & RPDs (TCC)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                  ),
+                  Text(
+                    'Análise de crenças automáticas, distorções e eficácia da reestruturação',
+                    style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Grid com 4 KPIs Cognitivos
+        Row(
+          children: [
+            Expanded(
+              child: _buildCogniKpiCard(
+                'Total de RPDs',
+                '${_thoughtRecords.length}',
+                'Registros no app',
+                Icons.edit_note_rounded,
+                const Color(0xFF6366F1),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCogniKpiCard(
+                'Alívio Médio',
+                avgRelief > 0 ? '-${avgRelief.toStringAsFixed(0)}%' : '0%',
+                'Redução emocional',
+                Icons.trending_down_rounded,
+                AppColors.success,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildCogniKpiCard(
+                'Distorção Principal',
+                topDistortionName,
+                'Padrão mais frequente',
+                Icons.psychology_alt_rounded,
+                const Color(0xFFF59E0B),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCogniKpiCard(
+                'Gatilho Frequente',
+                topTriggerName,
+                'Contexto de ativação',
+                Icons.bolt_rounded,
+                const Color(0xFFEF4444),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCogniKpiCard(String label, String value, String subtitle, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              Icon(icon, size: 16, color: color),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color),
+          ),
+          const SizedBox(height: 2),
+          Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCognitiveDistortionsChartSection() {
+    final map = _thoughtService.getDistortionDistribution(_thoughtRecords);
+    if (map.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: const Center(
+          child: Text(
+            'Nenhuma distorção identificada nos registros ainda.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    final sorted = map.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final totalOccurrences = map.values.fold<int>(0, (sum, val) => sum + val);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Distribuição de Distorções Cognitivas',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$totalOccurrences identif.',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF6366F1)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Frequência com que o paciente ativa cada armadilha do pensamento:',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+
+          ...sorted.map((entry) {
+            final info = CognitiveDistortionCatalog.findById(entry.key);
+            final title = info?.title ?? entry.key;
+            final count = entry.value;
+            final percentage = totalOccurrences > 0 ? (count / totalOccurrences) : 0.0;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(info?.icon ?? Icons.label_outline, size: 14, color: const Color(0xFF6366F1)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '$count x (${(percentage * 100).toStringAsFixed(0)}%)',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF6366F1)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: percentage,
+                      minHeight: 7,
+                      backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTriggersMatrixSection() {
+    final topTriggers = _thoughtService.getTopTriggers(_thoughtRecords);
+    if (topTriggers.isEmpty) return const SizedBox();
+
+    final sorted = topTriggers.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Contextos & Gatilhos Críticos Mais Frequentes',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Situações e áreas que disparam pensamentos disfuncionais:',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: sorted.take(8).map((entry) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFEF4444)),
+                    const SizedBox(width: 4),
+                    Text(
+                      entry.key,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${entry.value}x',
+                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFFEF4444)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPsychologistRpdItemCard(ThoughtRecordEntry rpd) {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    final dateStr = '${rpd.createdAt.day} ${months[rpd.createdAt.month - 1]} às ${rpd.createdAt.hour.toString().padLeft(2, '0')}:${rpd.createdAt.minute.toString().padLeft(2, '0')}';
+    final relief = rpd.averageRelief;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => ThoughtRecordDetailsDialog(record: rpd),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('RPD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF6366F1))),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        dateStr,
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                    ),
+                    if (relief > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '-$relief% alívio',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.success),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  rpd.situation,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Pensamento: "${rpd.automaticThought}"',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Resposta Racional: "${rpd.rationalResponse}"',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    ...rpd.emotions.take(3).map((e) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(6)),
+                      child: Text('${e.emoji} ${e.name} ${e.initialIntensity}%', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
+                    )),
+                    ...rpd.cognitiveDistortions.map((d) {
+                      final info = CognitiveDistortionCatalog.findById(d);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                        child: Text(info?.shortName ?? d, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))),
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CustomPainter: Gráfico de Evolução Temporal

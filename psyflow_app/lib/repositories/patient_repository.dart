@@ -20,14 +20,22 @@ class FirestorePatientRepository implements PatientRepository {
   Future<List<PatientLink>> getPatientsForProfessional(String professionalId) async {
     try {
       final snap = await _db
-          .collection('links')
-          .where('psychologist_id', isEqualTo: professionalId)
-          .orderBy('created_at', descending: true)
+          .collection('therapist_patient_links')
+          .where('psychologistId', isEqualTo: professionalId)
+          .where('status', isEqualTo: 'active')
+          .orderBy('createdAt', descending: true)
           .get();
 
       if (snap.docs.isEmpty) return [];
 
-      final links = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      final links = snap.docs
+          .map((d) => {
+                'id': d.id,
+                'active': d.data()['status'] == 'active',
+                'created_at': d.data()['createdAt'],
+                'patient_id': d.data()['patientId'],
+              })
+          .toList();
       final patientIds = links
           .map((l) => l['patient_id'] as String?)
           .whereType<String>()
@@ -70,15 +78,21 @@ class FirestorePatientRepository implements PatientRepository {
   Future<Map<String, dynamic>?> getProfessionalForPatient(String patientId) async {
     try {
       final snap = await _db
-          .collection('links')
-          .where('patient_id', isEqualTo: patientId)
-          .where('active', isEqualTo: true)
+          .collection('therapist_patient_links')
+          .where('patientId', isEqualTo: patientId)
+          .where('status', isEqualTo: 'active')
           .limit(1)
           .get();
 
       if (snap.docs.isEmpty) return null;
 
-      final link = {'id': snap.docs.first.id, ...snap.docs.first.data()};
+      final link = {
+        'id': snap.docs.first.id,
+        'active': true,
+        'created_at': snap.docs.first.data()['createdAt'],
+        'patient_id': patientId,
+        'psychologist_id': snap.docs.first.data()['psychologistId'],
+      };
       final psychId = link['psychologist_id'] as String?;
 
       if (psychId != null) {
@@ -97,7 +111,10 @@ class FirestorePatientRepository implements PatientRepository {
   @override
   Future<void> deactivateLink(String linkId) async {
     try {
-      await _db.collection('links').doc(linkId).update({'active': false});
+      await _db
+          .collection('therapist_patient_links')
+          .doc(linkId)
+          .update({'status': 'inactive'});
     } catch (e) {
       throw AppException('Erro ao desvincular paciente: $e', originalError: e);
     }
@@ -106,7 +123,10 @@ class FirestorePatientRepository implements PatientRepository {
   @override
   Future<void> reactivateLink(String linkId) async {
     try {
-      await _db.collection('links').doc(linkId).update({'active': true});
+      await _db
+          .collection('therapist_patient_links')
+          .doc(linkId)
+          .update({'status': 'active'});
     } catch (e) {
       throw AppException('Erro ao reativar vínculo: $e', originalError: e);
     }
@@ -115,14 +135,22 @@ class FirestorePatientRepository implements PatientRepository {
   @override
   Stream<List<PatientLink>> streamPatientsForProfessional(String professionalId) {
     return _db
-        .collection('links')
-        .where('psychologist_id', isEqualTo: professionalId)
-        .orderBy('created_at', descending: true)
+        .collection('therapist_patient_links')
+        .where('psychologistId', isEqualTo: professionalId)
+        .where('status', isEqualTo: 'active')
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snap) async {
       if (snap.docs.isEmpty) return [];
 
-      final links = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      final links = snap.docs
+          .map((d) => {
+                'id': d.id,
+                'active': d.data()['status'] == 'active',
+                'created_at': d.data()['createdAt'],
+                'patient_id': d.data()['patientId'],
+              })
+          .toList();
       final patientIds = links
           .map((l) => l['patient_id'] as String?)
           .whereType<String>()

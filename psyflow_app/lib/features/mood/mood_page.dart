@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:printing/printing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/mood_service.dart';
+import '../../core/services/report_service.dart';
+import '../../core/services/thought_record_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../models/mood_model.dart';
+import '../../models/thought_record_model.dart';
+import 'thought_record_creator_page.dart';
+import 'thought_record_details_dialog.dart';
 
 class MoodPage extends StatefulWidget {
   const MoodPage({super.key});
@@ -13,9 +20,12 @@ class MoodPage extends StatefulWidget {
 
 class _MoodPageState extends State<MoodPage> {
   final _moodService = sl<MoodService>();
+  final _thoughtService = sl<ThoughtRecordService>();
   List<MoodEntry> _entries = [];
+  List<ThoughtRecordEntry> _thoughtRecords = [];
   bool _loading = true;
   bool _hasToday = false;
+  String _feedFilter = 'todos'; // 'todos', 'mood', 'rpd'
 
   @override
   void initState() {
@@ -28,10 +38,12 @@ class _MoodPageState extends State<MoodPage> {
     try {
       final entries = await _moodService.getMyEntries();
       final hasToday = await _moodService.hasEntryToday();
+      final rpds = await _thoughtService.getMyThoughtRecords();
       if (mounted) {
         setState(() {
           _entries = entries;
           _hasToday = hasToday;
+          _thoughtRecords = rpds;
           _loading = false;
         });
       }
@@ -69,6 +81,39 @@ class _MoodPageState extends State<MoodPage> {
     }
   }
 
+  Future<void> _printMoodHistory() async {
+    if (_entries.isEmpty) {
+      _showError('Nenhum registro de humor encontrado para imprimir relatório.');
+      return;
+    }
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final name = user?.displayName ?? 'Paciente';
+      final startDate = _entries.map((e) => e.createdAt).reduce((a, b) => a.isBefore(b) ? a : b);
+      final endDate = DateTime.now();
+
+      final pdfBytes = await ReportService().generatePatientProgressReport(
+        patientName: name,
+        patientId: user?.uid ?? '',
+        professionalName: 'Auto-acompanhamento',
+        professionalSpecialty: 'PsyFlow - Histórico Pessoal de Humor',
+        moodEntries: _entries,
+        tasks: const [],
+        sessions: const [],
+        scaleResponses: const [],
+        periodStart: startDate,
+        periodEnd: endDate,
+      );
+
+      await Printing.layoutPdf(
+        name: 'Historico_Humor_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        onLayout: (format) async => pdfBytes,
+      );
+    } catch (e) {
+      _showError('Erro ao imprimir relatório: $e');
+    }
+  }
+
   String _formatDateTime(DateTime d) {
     const months = [
       'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -93,6 +138,14 @@ class _MoodPageState extends State<MoodPage> {
             pinned: true,
             backgroundColor: AppColors.patient,
             elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.print_rounded, color: Colors.white),
+                tooltip: 'Imprimir / Exportar Histórico de Humor',
+                onPressed: _printMoodHistory,
+              ),
+              const SizedBox(width: 8),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
@@ -192,8 +245,10 @@ class _MoodPageState extends State<MoodPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Banner de Ação de Check-in
+                  // Banners de Ação (Check-in & RPD Estilo Cogni)
                   _buildDailyCheckInBanner(),
+                  const SizedBox(height: 12),
+                  _buildThoughtRecordActionBanner(),
                   const SizedBox(height: 24),
 
                   // Pilares de Acompanhamento (Atalhos rápidos)
@@ -237,12 +292,12 @@ class _MoodPageState extends State<MoodPage> {
                     const SizedBox(height: 28),
                   ],
 
-                  // Histórico de Registros
+                  // Histórico de Registros com Filtros
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Histórico de Diários & Check-ins',
+                        'Linha do Tempo & Histórico',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -255,6 +310,18 @@ class _MoodPageState extends State<MoodPage> {
                         tooltip: 'Atualizar',
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Filtros da Linha do Tempo
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('Todos', 'todos', _entries.length + _thoughtRecords.length),
+                        _buildFilterChip('Check-ins de Humor', 'mood', _entries.length),
+                        _buildFilterChip('RPDs (Pensamentos)', 'rpd', _thoughtRecords.length),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -270,7 +337,7 @@ class _MoodPageState extends State<MoodPage> {
                 child: CircularProgressIndicator(color: AppColors.patient),
               ),
             )
-          else if (_entries.isEmpty)
+          else if (_getCombinedFeed().isEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
@@ -291,7 +358,7 @@ class _MoodPageState extends State<MoodPage> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Nenhum registro ainda',
+                        'Nenhum registro encontrado',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
@@ -300,21 +367,9 @@ class _MoodPageState extends State<MoodPage> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Faça seu primeiro check-in diário para começar a visualizar suas tendências.',
+                        'Faça seu check-in diário ou registre um pensamento para iniciar seu acompanhamento.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.patient,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                        onPressed: () => _openRegisterSheet(),
-                        icon: const Icon(Icons.add_circle_outline_rounded),
-                        label: const Text('Fazer check-in agora', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -327,10 +382,15 @@ class _MoodPageState extends State<MoodPage> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final entry = _entries[index];
-                    return _buildEntryCard(entry);
+                    final item = _getCombinedFeed()[index];
+                    if (item is MoodEntry) {
+                      return _buildEntryCard(item);
+                    } else if (item is ThoughtRecordEntry) {
+                      return _buildThoughtRecordCard(item);
+                    }
+                    return const SizedBox();
                   },
-                  childCount: _entries.length,
+                  childCount: _getCombinedFeed().length,
                 ),
               ),
             ),
@@ -423,6 +483,265 @@ class _MoodPageState extends State<MoodPage> {
                     color: AppColors.patient,
                     size: 14,
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThoughtRecordActionBanner() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () async {
+            final saved = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => const ThoughtRecordCreatorPage()),
+            );
+            if (saved == true) _load();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 28),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Novo RPD (Registro de Pensamentos)',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Identifique pensamentos automáticos e distorções cognitivas (TCC).',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Color(0xFF6366F1),
+                    size: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String filterKey, int count) {
+    final isSelected = _feedFilter == filterKey;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text('$label ($count)'),
+        selected: isSelected,
+        selectedColor: AppColors.patient.withValues(alpha: 0.15),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+          color: isSelected ? AppColors.patient : AppColors.textSecondary,
+        ),
+        onSelected: (val) => setState(() => _feedFilter = filterKey),
+      ),
+    );
+  }
+
+  List<dynamic> _getCombinedFeed() {
+    final list = <dynamic>[];
+    if (_feedFilter == 'todos' || _feedFilter == 'mood') {
+      list.addAll(_entries);
+    }
+    if (_feedFilter == 'todos' || _feedFilter == 'rpd') {
+      list.addAll(_thoughtRecords);
+    }
+
+    list.sort((a, b) {
+      DateTime dateA = a is MoodEntry ? a.createdAt : (a as ThoughtRecordEntry).createdAt;
+      DateTime dateB = b is MoodEntry ? b.createdAt : (b as ThoughtRecordEntry).createdAt;
+      return dateB.compareTo(dateA);
+    });
+
+    return list;
+  }
+
+  Widget _buildThoughtRecordCard(ThoughtRecordEntry rpd) {
+    final relief = rpd.averageRelief;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => ThoughtRecordDetailsDialog(
+                record: rpd,
+                onDelete: () async {
+                  Navigator.pop(context);
+                  await _thoughtService.deleteThoughtRecord(rpd.id);
+                  _load();
+                },
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.psychology_rounded, size: 14, color: Color(0xFF6366F1)),
+                          SizedBox(width: 4),
+                          Text(
+                            'RPD • TCC',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF6366F1)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (relief > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '-$relief% alívio 🎉',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.success),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  rpd.situation,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pensamento: "${rpd.automaticThought}"',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    ...rpd.emotions.take(3).map((e) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('${e.emoji} ${e.name} ${e.initialIntensity}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    )),
+                    ...rpd.cognitiveDistortions.take(2).map((d) {
+                      final info = CognitiveDistortionCatalog.findById(d);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(info?.shortName ?? d, style: const TextStyle(fontSize: 10.5, color: Color(0xFF4F46E5), fontWeight: FontWeight.w700)),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatDateTime(rpd.createdAt),
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),

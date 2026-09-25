@@ -4,85 +4,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/errors/app_exception.dart';
 import '../../models/patient_link_model.dart';
 
-class TherapistPatientLink {
-  final String id;
-  final String psychologistId;
-  final String? patientId;
-  final String inviteCode;
-  final String status; // 'pending', 'active', 'inactive', 'expired'
-  final DateTime createdAt;
-  final DateTime expiresAt;
-  final DateTime? acceptedAt;
-  final PatientProfile? patientProfile;
-
-  // Métricas rápidas para o card do paciente no dashboard
-  final double? avgMood;
-  final double? avgAnxiety;
-  final int completedTasks;
-  final int totalTasks;
-
-  const TherapistPatientLink({
-    required this.id,
-    required this.psychologistId,
-    this.patientId,
-    required this.inviteCode,
-    required this.status,
-    required this.createdAt,
-    required this.expiresAt,
-    this.acceptedAt,
-    this.patientProfile,
-    this.avgMood,
-    this.avgAnxiety,
-    this.completedTasks = 0,
-    this.totalTasks = 0,
-  });
-
-  bool get isActive => status == 'active';
-  bool get isPending => status == 'pending';
-
-  factory TherapistPatientLink.fromMap(Map<String, dynamic> map, String id, {PatientProfile? profile, double? avgMood, double? avgAnxiety, int completedTasks = 0, int totalTasks = 0}) {
-    DateTime parseDate(dynamic val) {
-      if (val is Timestamp) return val.toDate();
-      if (val is DateTime) return val;
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
-      return DateTime.now();
-    }
-
-    return TherapistPatientLink(
-      id: id,
-      psychologistId: (map['psychologistId'] ?? map['psychologist_id'] ?? '') as String,
-      patientId: map['patientId'] as String? ?? map['patient_id'] as String?,
-      inviteCode: (map['inviteCode'] ?? map['invite_code'] ?? '') as String,
-      status: (map['status'] ?? 'pending') as String,
-      createdAt: parseDate(map['createdAt'] ?? map['created_at']),
-      expiresAt: parseDate(map['expiresAt'] ?? map['expires_at']),
-      acceptedAt: map['acceptedAt'] != null || map['accepted_at'] != null
-          ? parseDate(map['acceptedAt'] ?? map['accepted_at'])
-          : null,
-      patientProfile: profile,
-      avgMood: avgMood,
-      avgAnxiety: avgAnxiety,
-      completedTasks: completedTasks,
-      totalTasks: totalTasks,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'psychologistId': psychologistId,
-      'patientId': patientId,
-      'inviteCode': inviteCode,
-      'status': status,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'expiresAt': Timestamp.fromDate(expiresAt),
-      'acceptedAt': acceptedAt != null ? Timestamp.fromDate(acceptedAt!) : null,
-    };
-  }
-}
-
+/// Serviço canônico de vínculo psicólogo ↔ paciente.
+///
+/// Regras de negócio:
+/// - Um paciente pode ter N profissionais (N:N).
+/// - Um profissional pode ter N pacientes.
+/// - Somente um vínculo ATIVO por par (psicólogo, paciente) é permitido.
+/// - O código de convite expira em 7 dias; status muda para "expired".
+/// - Coleção canônica: `therapist_patient_links`.
+/// - As coleções legadas `links` e `invites` são read-only após migração.
 class TherapistPatientService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
+
+  static const String _col = 'therapist_patient_links';
 
   TherapistPatientService({
     required FirebaseFirestore firestore,
@@ -90,30 +25,126 @@ class TherapistPatientService {
   })  : _db = firestore,
         _auth = auth;
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Helpers
+  // ──────────────────────────────────────────────────────────────────────────
+
   /// Gera código numérico de 6 dígitos (ex: 842716)
-  String _generateNumeric6DigitCode() {
+  String _generateCode() {
     final rnd = Random.secure();
     return (100000 + rnd.nextInt(900000)).toString();
   }
 
-  /// 1. Psicólogo gera código de vínculo pré-consulta
+  String _inviteLinkId(String psychologistId, String code) =>
+      '${psychologistId}_$code';
+
+  String _activeLinkId(String psychologistId, String patientId) =>
+      '${psychologistId}_$patientId';
+
+  User get _currentUser {
+    final u = _auth.currentUser;
+    if (u == null) throw AppException('Usuário não autenticado.');
+    return u;
+  }
+
+  Future<PatientProfile?> _fetchPatientProfile(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return PatientProfile.fromMap({'id': doc.id, ...doc.data()!});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<TherapistProfile?> _fetchTherapistProfile(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return TherapistProfile.fromMap({'id': doc.id, ...doc.data()!});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<({double? avgMood, double? avgAnxiety})> _fetchMoodMetrics(String patientId) async {
+    try {
+      final snap = await _db
+          .collection('mood_entries')
+          .where('patient_id', isEqualTo: patientId)
+          .orderBy('created_at', descending: true)
+          .limit(10)
+          .get();
+
+      if (snap.docs.isEmpty) return (avgMood: null, avgAnxiety: null);
+
+      double sumMood = 0;
+      double sumAnxiety = 0;
+      for (final m in snap.docs) {
+        final d = m.data();
+        sumMood += (d['mood'] as num?)?.toDouble() ?? 5.0;
+        sumAnxiety += (d['anxiety'] as num?)?.toDouble() ?? 4.0;
+      }
+      return (
+        avgMood: sumMood / snap.docs.length,
+        avgAnxiety: sumAnxiety / snap.docs.length,
+      );
+    } catch (_) {
+      return (avgMood: null, avgAnxiety: null);
+    }
+  }
+
+  Future<({int completed, int total})> _fetchTaskMetrics(
+    String patientId,
+    String psychologistId,
+  ) async {
+    try {
+      final snap = await _db
+          .collection('tasks')
+          .where('patient_id', isEqualTo: patientId)
+          .where('psychologist_id', isEqualTo: psychologistId)
+          .get();
+
+      final total = snap.docs.length;
+      final completed =
+          snap.docs.where((t) => t.data()['status'] == 'completed').length;
+      return (completed: completed, total: total);
+    } catch (_) {
+      return (completed: 0, total: 0);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. Psicólogo gera código de convite
+  // ──────────────────────────────────────────────────────────────────────────
+
   Future<String> generateInviteCode() async {
-    final user = _auth.currentUser;
-    if (user == null) throw AppException('Usuário não autenticado.');
+    final user = _currentUser;
+
+    // Buscar nome do profissional para desnormalizar
+    String? therapistName;
+    try {
+      final doc = await _db.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final d = doc.data()!;
+        therapistName = (d['full_name'] ?? d['fullName'] ?? d['name']) as String?;
+      }
+    } catch (_) {}
+
+    final code = _generateCode();
+    final now = DateTime.now();
 
     try {
-      final code = _generateNumeric6DigitCode();
-      final now = DateTime.now();
-      final expiresAt = now.add(const Duration(days: 7));
-
-      await _db.collection('therapist_patient_links').add({
+      await _db.collection(_col).doc(_inviteLinkId(user.uid, code)).set({
         'psychologistId': user.uid,
         'patientId': null,
         'inviteCode': code,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
-        'expiresAt': Timestamp.fromDate(expiresAt),
+        'expiresAt': Timestamp.fromDate(now.add(const Duration(days: 7))),
         'acceptedAt': null,
+        'patientName': null,
+        'therapistName': therapistName,
       });
 
       return code;
@@ -122,19 +153,22 @@ class TherapistPatientService {
     }
   }
 
-  /// 2. Paciente aceita o código de 6 dígitos
-  Future<void> acceptInviteCode(String code) async {
-    final patient = _auth.currentUser;
-    if (patient == null) throw AppException('Usuário não autenticado.');
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. Paciente aceita o código de 6 dígitos
+  // ──────────────────────────────────────────────────────────────────────────
 
+  Future<void> acceptInviteCode(String code) async {
+    final patient = _currentUser;
     final cleanCode = code.trim();
+
     if (cleanCode.length != 6) {
       throw AppException('O código de vínculo deve conter exatamente 6 dígitos.');
     }
 
     try {
+      // Buscar o convite pendente
       final snap = await _db
-          .collection('therapist_patient_links')
+          .collection(_col)
           .where('inviteCode', isEqualTo: cleanCode)
           .where('status', isEqualTo: 'pending')
           .limit(1)
@@ -147,23 +181,56 @@ class TherapistPatientService {
       final doc = snap.docs.first;
       final data = doc.data();
 
-      // Validação de expiração
+      // Validar expiração
       final expiresAt = (data['expiresAt'] as Timestamp).toDate();
       if (DateTime.now().isAfter(expiresAt)) {
         await doc.reference.update({'status': 'expired'});
-        throw AppException('Este código expirou. Solicite um novo código ao seu psicólogo.');
+        throw AppException(
+            'Este código expirou. Solicite um novo código ao seu profissional.');
       }
 
-      // Evita vincular consigo mesmo
-      if (data['psychologistId'] == patient.uid) {
-        throw AppException('Você não pode utilizar seu próprio código de psicólogo.');
+      // Evitar auto-vínculo
+      final psychologistId = data['psychologistId'] as String;
+      if (psychologistId == patient.uid) {
+        throw AppException('Você não pode utilizar seu próprio código de profissional.');
       }
 
-      // Atualização atômica para ativo
-      await doc.reference.update({
-        'patientId': patient.uid,
-        'status': 'active',
-        'acceptedAt': FieldValue.serverTimestamp(),
+      final activeLink = _db
+          .collection(_col)
+          .doc(_activeLinkId(psychologistId, patient.uid));
+
+      final duplicateSnap = await _db
+          .collection(_col)
+          .where('psychologistId', isEqualTo: psychologistId)
+          .where('patientId', isEqualTo: patient.uid)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+      if (duplicateSnap.docs.isNotEmpty) {
+        throw AppException('Você já está vinculado a este profissional.');
+      }
+
+      // Buscar nome do paciente para desnormalizar
+      String? patientName;
+      try {
+        final userDoc = await _db.collection('users').doc(patient.uid).get();
+        if (userDoc.exists) {
+          final d = userDoc.data()!;
+          patientName = (d['full_name'] ?? d['fullName'] ?? d['name']) as String?;
+        }
+      } catch (_) {}
+
+      // O ID determinístico impede duplicatas e permite que as Security Rules
+      // validem o vínculo entre um profissional e um paciente específico.
+      await _db.runTransaction((transaction) async {
+        transaction.set(activeLink, {
+          ...data,
+          'patientId': patient.uid,
+          'status': 'active',
+          'acceptedAt': FieldValue.serverTimestamp(),
+          'patientName': patientName,
+        });
+        transaction.update(doc.reference, {'status': 'accepted'});
       });
     } catch (e) {
       if (e is AppException) rethrow;
@@ -171,138 +238,236 @@ class TherapistPatientService {
     }
   }
 
-  /// 3. Lista de pacientes vinculados do psicólogo (com métricas para o card)
-  Future<List<TherapistPatientLink>> getMyPatientsLinks() async {
-    final user = _auth.currentUser;
-    if (user == null) throw AppException('Usuário não autenticado.');
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. Psicólogo — lista pacientes vinculados (one-shot com métricas)
+  // ──────────────────────────────────────────────────────────────────────────
 
+  Future<List<TherapistPatientLink>> getMyPatients() async {
+    final user = _currentUser;
     try {
       final snap = await _db
-          .collection('therapist_patient_links')
+          .collection(_col)
           .where('psychologistId', isEqualTo: user.uid)
           .where('status', isEqualTo: 'active')
           .get();
 
-      final links = <TherapistPatientLink>[];
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final patientId = data['patientId'] as String?;
-
-        PatientProfile? profile;
-        double? avgMood;
-        double? avgAnxiety;
-        int completedTasks = 0;
-        int totalTasks = 0;
-
-        if (patientId != null) {
-          // Dados do usuário paciente
-          final userDoc = await _db.collection('users').doc(patientId).get();
-          if (userDoc.exists && userDoc.data() != null) {
-            profile = PatientProfile.fromMap({'id': userDoc.id, ...userDoc.data()!});
-          }
-
-          // Métricas recentes de humor (últimos 7 registros)
-          try {
-            final moodSnap = await _db
-                .collection('mood_entries')
-                .where('patient_id', isEqualTo: patientId)
-                .orderBy('created_at', descending: true)
-                .limit(7)
-                .get();
-
-            if (moodSnap.docs.isNotEmpty) {
-              double sumMood = 0;
-              double sumAnxiety = 0;
-              for (final m in moodSnap.docs) {
-                final d = m.data();
-                sumMood += (d['mood'] as num?)?.toDouble() ?? 5.0;
-                sumAnxiety += (d['anxiety'] as num?)?.toDouble() ?? 4.0;
-              }
-              avgMood = sumMood / moodSnap.docs.length;
-              avgAnxiety = sumAnxiety / moodSnap.docs.length;
-            }
-          } catch (_) {}
-
-          // Métricas de tarefas
-          try {
-            final tasksSnap = await _db
-                .collection('tasks')
-                .where('patient_id', isEqualTo: patientId)
-                .get();
-
-            totalTasks = tasksSnap.docs.length;
-            completedTasks = tasksSnap.docs
-                .where((t) => t.data()['status'] == 'completed')
-                .length;
-          } catch (_) {}
-        }
-
-        links.add(
-          TherapistPatientLink.fromMap(
-            data,
-            doc.id,
-            profile: profile,
-            avgMood: avgMood,
-            avgAnxiety: avgAnxiety,
-            completedTasks: completedTasks,
-            totalTasks: totalTasks,
-          ),
-        );
-      }
-
-      return links;
+      return await _enrichLinks(snap.docs, forPsychologist: true);
     } catch (e) {
       throw AppException('Erro ao carregar pacientes vinculados: $e', originalError: e);
     }
   }
 
-  /// 4. Paciente busca seu psicólogo vinculado
-  Future<Map<String, dynamic>?> getMyTherapistLink() async {
+  /// Stream em tempo real dos pacientes do profissional
+  Stream<List<TherapistPatientLink>> watchMyPatients() {
     final user = _auth.currentUser;
-    if (user == null) throw AppException('Usuário não autenticado.');
+    if (user == null) return const Stream.empty();
 
+    return _db
+        .collection(_col)
+        .where('psychologistId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .asyncMap((snap) => _enrichLinks(snap.docs, forPsychologist: true));
+  }
+
+  /// Retorna lista simples de vínculos ativos (usado para contagem no dashboard)
+  Future<List<TherapistPatientLink>> getMyPatientsLinks() async {
+    final user = _currentUser;
     try {
       final snap = await _db
-          .collection('therapist_patient_links')
-          .where('patientId', isEqualTo: user.uid)
+          .collection(_col)
+          .where('psychologistId', isEqualTo: user.uid)
           .where('status', isEqualTo: 'active')
-          .limit(1)
           .get();
 
-      if (snap.docs.isEmpty) return null;
-
-      final doc = snap.docs.first;
-      final data = doc.data();
-
-      final psychDoc = await _db.collection('users').doc(data['psychologistId']).get();
-      return {
-        'linkId': doc.id,
-        'status': data['status'],
-        'acceptedAt': data['acceptedAt'],
-        'psychologistId': data['psychologistId'],
-        'psychologist': psychDoc.exists ? {'id': psychDoc.id, ...psychDoc.data()!} : null,
-      };
+      return snap.docs
+          .map((doc) => TherapistPatientLink.fromMap(doc.data(), doc.id))
+          .toList();
     } catch (e) {
-      throw AppException('Erro ao buscar psicólogo vinculado: $e', originalError: e);
+      throw AppException('Erro ao buscar vínculos: $e', originalError: e);
     }
   }
 
-  /// Desativa vínculo
+  /// Verifica o vínculo ativo canônico entre um profissional e um paciente.
+  Future<bool> isLinked(String psychologistId, String patientId) async {
+    try {
+      final link = await _db
+          .collection(_col)
+          .doc(_activeLinkId(psychologistId, patientId))
+          .get();
+      return link.exists && link.data()?['status'] == 'active';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 4. Paciente — lista profissionais vinculados (N:N)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<List<TherapistPatientLink>> getMyTherapists() async {
+    final user = _currentUser;
+    try {
+      final snap = await _db
+          .collection(_col)
+          .where('patientId', isEqualTo: user.uid)
+          .where('status', isEqualTo: 'active')
+          .get();
+
+      return await _enrichLinks(snap.docs, forPsychologist: false);
+    } catch (e) {
+      throw AppException('Erro ao buscar profissionais vinculados: $e', originalError: e);
+    }
+  }
+
+  /// Stream em tempo real dos profissionais do paciente
+  Stream<List<TherapistPatientLink>> watchMyTherapists() {
+    final user = _auth.currentUser;
+    if (user == null) return const Stream.empty();
+
+    return _db
+        .collection(_col)
+        .where('patientId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .asyncMap((snap) => _enrichLinks(snap.docs, forPsychologist: false));
+  }
+
+  /// Retrocompatibilidade: retorna o primeiro profissional vinculado (para partes
+  /// do app que assumem 1 psicólogo por paciente).
+  Future<Map<String, dynamic>?> getMyTherapistLink() async {
+    final therapists = await getMyTherapists();
+    if (therapists.isEmpty) return null;
+    final link = therapists.first;
+    return {
+      'linkId': link.id,
+      'status': link.status.name,
+      'acceptedAt': link.acceptedAt,
+      'psychologistId': link.psychologistId,
+      'psychologist': link.therapistProfile != null
+          ? {
+              'id': link.therapistProfile!.id,
+              'full_name': link.therapistProfile!.fullName,
+              'email': link.therapistProfile!.email,
+              'specialty': link.therapistProfile!.specialty,
+              'professional_registration': link.therapistProfile!.professionalRegistration,
+              'photo_url': link.therapistProfile!.photoUrl,
+            }
+          : null,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 5. Verificação de vínculo ativo entre dois usuários
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Busca o linkId do vínculo ativo entre dois usuários (null se não existir)
+  Future<String?> getActiveLinkId(String psychologistId, String patientId) async {
+    try {
+      final snap = await _db
+          .collection(_col)
+          .where('psychologistId', isEqualTo: psychologistId)
+          .where('patientId', isEqualTo: patientId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty ? snap.docs.first.id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6. Convites pendentes do profissional
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<List<TherapistPatientLink>> getMyPendingInvites() async {
+    final user = _currentUser;
+    try {
+      final snap = await _db
+          .collection(_col)
+          .where('psychologistId', isEqualTo: user.uid)
+          .where('status', isEqualTo: 'pending')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snap.docs
+          .map((doc) => TherapistPatientLink.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw AppException('Erro ao carregar convites pendentes: $e', originalError: e);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. Ativar / Desativar vínculo
+  // ──────────────────────────────────────────────────────────────────────────
+
   Future<void> deactivateLink(String linkId) async {
     try {
-      await _db.collection('therapist_patient_links').doc(linkId).update({'status': 'inactive'});
+      await _db.collection(_col).doc(linkId).update({'status': 'inactive'});
     } catch (e) {
       throw AppException('Erro ao desativar vínculo: $e', originalError: e);
     }
   }
 
-  /// Reativa vínculo
   Future<void> reactivateLink(String linkId) async {
     try {
-      await _db.collection('therapist_patient_links').doc(linkId).update({'status': 'active'});
+      await _db.collection(_col).doc(linkId).update({'status': 'active'});
     } catch (e) {
       throw AppException('Erro ao reativar vínculo: $e', originalError: e);
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Helper interno: enriquece links com perfis e métricas
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<List<TherapistPatientLink>> _enrichLinks(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
+    required bool forPsychologist,
+  }) async {
+    final links = <TherapistPatientLink>[];
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final patientId = data['patientId'] as String?;
+      final psychologistId = data['psychologistId'] as String?;
+
+      PatientProfile? patientProfile;
+      TherapistProfile? therapistProfile;
+      double? avgMood;
+      double? avgAnxiety;
+      int completedTasks = 0;
+      int totalTasks = 0;
+
+      if (forPsychologist && patientId != null) {
+        // Psicólogo quer ver dados do paciente
+        patientProfile = await _fetchPatientProfile(patientId);
+        final mood = await _fetchMoodMetrics(patientId);
+        avgMood = mood.avgMood;
+        avgAnxiety = mood.avgAnxiety;
+        final tasks = await _fetchTaskMetrics(
+            patientId, psychologistId ?? _auth.currentUser!.uid);
+        completedTasks = tasks.completed;
+        totalTasks = tasks.total;
+      } else if (!forPsychologist && psychologistId != null) {
+        // Paciente quer ver dados do profissional
+        therapistProfile = await _fetchTherapistProfile(psychologistId);
+      }
+
+      links.add(TherapistPatientLink.fromMap(
+        data,
+        doc.id,
+        patientProfile: patientProfile,
+        therapistProfile: therapistProfile,
+        avgMood: avgMood,
+        avgAnxiety: avgAnxiety,
+        completedTasks: completedTasks,
+        totalTasks: totalTasks,
+      ));
+    }
+
+    return links;
   }
 }

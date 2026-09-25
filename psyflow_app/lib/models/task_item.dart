@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/task_catalog.dart';
 
 class TaskItem {
   final String id;
@@ -21,6 +22,12 @@ class TaskItem {
   final String? patientName;
   final int order;
 
+  // Novos campos estruturados conforme tarefas.md
+  final String faixaEtaria; // 'Criança', 'Adolescente', 'Adulto', 'Idoso', 'Todas'
+  final Map<String, dynamic>? configuracoes; // permite_notificacao, frequencia_lembrete, horario_lembrete, compartilhamento
+  final Map<String, dynamic>? estruturaResposta; // tipo_input, campos: [{ordem, label, tipo, ...}]
+  final Map<String, dynamic>? respostaPaciente; // enviada_em, valores: {...}, is_draft: bool
+
   TaskItem({
     required this.id,
     required this.taskId,
@@ -41,6 +48,10 @@ class TaskItem {
     this.moodAfter,
     this.patientName,
     this.order = 0,
+    this.faixaEtaria = 'Adulto',
+    this.configuracoes,
+    this.estruturaResposta,
+    this.respostaPaciente,
   });
 
   factory TaskItem.fromMap(Map<String, dynamic> map) {
@@ -54,17 +65,17 @@ class TaskItem {
 
     return TaskItem(
       id: (map['id'] ?? '') as String,
-      taskId: (map['task_id'] ?? '') as String,
-      patientId: (map['patient_id'] ?? '') as String,
-      psychologistId: (map['psychologist_id'] ?? '') as String,
-      title: (map['title'] ?? '') as String,
-      description: map['description'] as String?,
-      category: map['category'] as String? ?? 'geral',
+      taskId: (map['task_id'] ?? map['id_tarefa'] ?? '') as String,
+      patientId: (map['patient_id'] ?? map['id_paciente'] ?? '') as String,
+      psychologistId: (map['psychologist_id'] ?? map['id_psicologo'] ?? '') as String,
+      title: (map['title'] ?? map['titulo'] ?? '') as String,
+      description: map['description'] as String? ?? map['descricao'] as String?,
+      category: map['category'] as String? ?? map['categoria'] as String? ?? 'geral',
       protocol: map['protocol'] as String? ?? '',
       difficultyLevel: (map['difficulty_level'] as num?)?.toInt() ?? 1,
       status: map['status'] as String? ?? 'pending',
-      dueDate: parseNullableDate(map['due_date']),
-      createdAt: parseNullableDate(map['created_at']),
+      dueDate: parseNullableDate(map['due_date'] ?? map['prazo_entrega']),
+      createdAt: parseNullableDate(map['created_at'] ?? map['data_criacao']),
       completedAt: parseNullableDate(map['completed_at']),
       patientResponse: map['patient_response'] as String?,
       therapistNotes: map['therapist_notes'] as String?,
@@ -72,7 +83,37 @@ class TaskItem {
       moodAfter: (map['mood_after'] as num?)?.toInt(),
       patientName: map['patient_name'] as String?,
       order: (map['order'] as num?)?.toInt() ?? 0,
+      faixaEtaria: (map['faixa_etaria'] ?? map['faixaEtaria'] ?? 'Adulto') as String,
+      configuracoes: map['configuracoes'] as Map<String, dynamic>?,
+      estruturaResposta: map['estrutura_resposta'] as Map<String, dynamic>?,
+      respostaPaciente: map['resposta_paciente'] as Map<String, dynamic>?,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'task_id': taskId,
+      'patient_id': patientId,
+      'psychologist_id': psychologistId,
+      'title': title,
+      'description': description,
+      'category': category,
+      'protocol': protocol,
+      'difficulty_level': difficultyLevel,
+      'status': status,
+      'due_date': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
+      'created_at': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'completed_at': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'patient_response': patientResponse,
+      'therapist_notes': therapistNotes,
+      'mood_before': moodBefore,
+      'mood_after': moodAfter,
+      'order': order,
+      'faixa_etaria': faixaEtaria,
+      'configuracoes': configuracoes,
+      'estrutura_resposta': estruturaResposta,
+      'resposta_paciente': respostaPaciente,
+    };
   }
 
   TaskItem copyWith({
@@ -95,6 +136,10 @@ class TaskItem {
     int? moodAfter,
     String? patientName,
     int? order,
+    String? faixaEtaria,
+    Map<String, dynamic>? configuracoes,
+    Map<String, dynamic>? estruturaResposta,
+    Map<String, dynamic>? respostaPaciente,
   }) {
     return TaskItem(
       id: id ?? this.id,
@@ -116,14 +161,45 @@ class TaskItem {
       moodAfter: moodAfter ?? this.moodAfter,
       patientName: patientName ?? this.patientName,
       order: order ?? this.order,
+      faixaEtaria: faixaEtaria ?? this.faixaEtaria,
+      configuracoes: configuracoes ?? this.configuracoes,
+      estruturaResposta: estruturaResposta ?? this.estruturaResposta,
+      respostaPaciente: respostaPaciente ?? this.respostaPaciente,
     );
   }
 
   bool get isCompleted => status == 'completed';
 
+  bool get isDraft => (respostaPaciente?['is_draft'] as bool?) == true;
+
   bool get isOverdue {
     if (dueDate == null) return false;
     if (isCompleted) return false;
     return DateTime.now().isAfter(dueDate!);
+  }
+
+  /// Lista de campos do formulário dinâmico
+  List<TaskFormFieldConfig> get formFields {
+    if (estruturaResposta == null) return [];
+    final rawFields = estruturaResposta!['campos'] as List<dynamic>?;
+    if (rawFields == null) return [];
+    return rawFields.map((f) => TaskFormFieldConfig.fromMap(f as Map<String, dynamic>)).toList();
+  }
+
+  /// Tipo de formulário
+  String get tipoInput => (estruturaResposta?['tipo_input'] ?? 'formulario_multiplo') as String;
+
+  /// Modo de compartilhamento
+  String get sharingMode => (configuracoes?['compartilhamento'] ?? 'automatico') as String;
+
+  bool get isSessionRestricted => sharingMode == 'sessao_presencial';
+
+  /// Valores salvos pelo paciente
+  Map<String, dynamic> get patientValues {
+    if (respostaPaciente == null) return {};
+    final val = respostaPaciente!['valores'];
+    if (val is Map<String, dynamic>) return val;
+    if (val is Map) return Map<String, dynamic>.from(val);
+    return {};
   }
 }

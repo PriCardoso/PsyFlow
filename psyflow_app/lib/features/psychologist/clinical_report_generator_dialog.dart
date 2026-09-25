@@ -3,10 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:printing/printing.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/report_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/providers/user_provider.dart';
-import '../../models/mood_model.dart';
+import 'package:psyflow_app/core/services/report_service.dart';
+import 'package:psyflow_app/core/services/appointment_service.dart';
+import 'package:psyflow_app/core/services/task_service.dart';
+import 'package:psyflow_app/core/services/clinical_scale_service.dart';
+import 'package:psyflow_app/core/services/thought_record_service.dart';
+import 'package:psyflow_app/models/clinical_session_model.dart';
+import 'package:psyflow_app/models/clinical_scale_model.dart';
+import 'package:psyflow_app/models/task_item.dart';
+import 'package:psyflow_app/models/mood_model.dart';
+import 'package:psyflow_app/models/thought_record_model.dart';
 
 class ClinicalReportGeneratorDialog extends StatefulWidget {
   final String patientId;
@@ -34,12 +44,48 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
   bool _includeSleep = true;
   bool _includeEnergy = true;
   bool _includeTasks = true;
+  bool _includeSessions = true;
+  bool _includeThoughtRecords = true;
   bool _includeNotes = true;
   bool _includeClinicalObservations = true;
 
   final _psychologistNotesController = TextEditingController();
   bool _previewMode = false;
   bool _isGeneratingPdf = false;
+
+  List<ClinicalSessionModel> _sessions = [];
+  List<TaskItem> _tasks = [];
+  List<ClinicalScaleResponseModel> _scaleResponses = [];
+  List<ThoughtRecordEntry> _thoughtRecords = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClinicalData();
+  }
+
+  Future<void> _loadClinicalData() async {
+    try {
+      final appointmentService = AppointmentService(FirebaseFirestore.instance);
+      final taskService = sl<TaskService>();
+      final scaleService = sl<ClinicalScaleService>();
+      final thoughtService = sl<ThoughtRecordService>();
+
+      final sessions = await appointmentService.getClinicalSessionsForPatient(widget.patientId);
+      final tasks = await taskService.getTasksForPatient(widget.patientId);
+      final scales = await scaleService.getPatientScaleResponses(widget.patientId);
+      final rpds = await thoughtService.getPatientThoughtRecords(widget.patientId);
+
+      if (mounted) {
+        setState(() {
+          _sessions = sessions;
+          _tasks = tasks;
+          _scaleResponses = scales;
+          _thoughtRecords = rpds;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -120,8 +166,24 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
         buffer.writeln('');
       }
 
+      if (_includeSessions && _sessions.isNotEmpty) {
+        buffer.writeln('3. EVOLUÇÃO DAS SESSÕES / CONSULTAS CLÍNICAS');
+        for (final s in _sessions) {
+          final d = s.sessionDate;
+          final dStr = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+          buffer.writeln('   • [$dStr] Resumo: ${s.summary}');
+          if (s.patientMoodObserved != null && s.patientMoodObserved!.isNotEmpty) {
+            buffer.writeln('     Estado emocional observado: ${s.patientMoodObserved}');
+          }
+          if (s.nextSteps != null && s.nextSteps!.isNotEmpty) {
+            buffer.writeln('     Próximos passos / Metas: ${s.nextSteps}');
+          }
+        }
+        buffer.writeln('');
+      }
+
       if (_includeClinicalObservations) {
-        buffer.writeln('3. PADRÕES E CORRELAÇÕES OBSERVADAS');
+        buffer.writeln('4. PADRÕES E CORRELAÇÕES OBSERVADAS');
         final highAnxiety = widget.entries.where((e) => e.anxiety >= 8).length;
         final poorSleep = widget.entries.where((e) => e.sleepQuality <= 4).length;
 
@@ -146,10 +208,28 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
         buffer.writeln('');
       }
 
+      if (_includeThoughtRecords && _thoughtRecords.isNotEmpty) {
+        buffer.writeln('5. REGISTROS DE PENSAMENTOS (RPD & TCC)');
+        for (final rpd in _thoughtRecords.take(5)) {
+          final d = rpd.createdAt;
+          final mIdx = (d.month - 1).clamp(0, 11);
+          final dStr = '${d.day.toString().padLeft(2, '0')}/${months[mIdx]}';
+          final relief = rpd.averageRelief;
+          buffer.writeln('   • [$dStr] Situação: "${rpd.situation}"');
+          buffer.writeln('     Pensamento: "${rpd.automaticThought}"');
+          if (rpd.cognitiveDistortions.isNotEmpty) {
+            final distNames = rpd.cognitiveDistortions.map((id) => CognitiveDistortionCatalog.findById(id)?.shortName ?? id).join(', ');
+            buffer.writeln('     Distorções: $distNames');
+          }
+          buffer.writeln('     Resposta Racional: "${rpd.rationalResponse}" ${relief > 0 ? "(-$relief% alívio)" : ""}');
+        }
+        buffer.writeln('');
+      }
+
       if (_includeNotes) {
         final entriesWithNotes = widget.entries.where((e) => e.notes != null && e.notes!.trim().isNotEmpty).toList();
         if (entriesWithNotes.isNotEmpty) {
-          buffer.writeln('4. EXCERTOS DO DIÁRIO / NOTAS DO PACIENTE');
+          buffer.writeln('5. EXCERTOS DO DIÁRIO / NOTAS DO PACIENTE');
           for (final entry in entriesWithNotes.take(5)) {
             final d = entry.createdAt;
             final mIdx = (d.month - 1).clamp(0, 11);
@@ -161,7 +241,7 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
       }
 
       if (_psychologistNotesController.text.trim().isNotEmpty) {
-        buffer.writeln('5. OBSERVAÇÕES E CONDUTA DO PSICÓLOGO');
+        buffer.writeln('6. OBSERVAÇÕES E CONDUTA DO PSICÓLOGO');
         buffer.writeln('   ${_psychologistNotesController.text.trim()}');
         buffer.writeln('');
       }
@@ -196,9 +276,10 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
         professionalName: profName,
         professionalSpecialty: 'Psicologia Clínica',
         moodEntries: widget.entries,
-        tasks: const [],
-        sessions: const [],
-        scaleResponses: const [],
+        tasks: _tasks,
+        sessions: _includeSessions ? _sessions : const [],
+        scaleResponses: _scaleResponses,
+        thoughtRecords: _includeThoughtRecords ? _thoughtRecords : const [],
         periodStart: startDate,
         periodEnd: endDate,
       );
@@ -412,6 +493,8 @@ class _ClinicalReportGeneratorDialogState extends State<ClinicalReportGeneratorD
             _buildCheckboxTile('Qualidade do Sono', 'Média de noites reparadoras', _includeSleep, (v) => setState(() => _includeSleep = v ?? true)),
             _buildCheckboxTile('Energia & Estresse', 'Métricas de vitalidade e tensão', _includeEnergy, (v) => setState(() => _includeEnergy = v ?? true)),
             _buildCheckboxTile('Adesão às Tarefas', 'Quantidade e taxa de tarefas concluídas', _includeTasks, (v) => setState(() => _includeTasks = v ?? true)),
+            _buildCheckboxTile('Evolução das Sessões', 'Resumos e evoluções clínicas das consultas', _includeSessions, (v) => setState(() => _includeSessions = v ?? true)),
+            _buildCheckboxTile('Registros de Pensamentos (RPD & TCC)', 'Pensamentos automáticos, distorções cognitivas e reestruturação', _includeThoughtRecords, (v) => setState(() => _includeThoughtRecords = v ?? true)),
             _buildCheckboxTile('Padrões & Correlações', 'Cruzamentos e fatores mais citados', _includeClinicalObservations, (v) => setState(() => _includeClinicalObservations = v ?? true)),
             _buildCheckboxTile('Excertos do Diário', 'Notas e reflexões escritas pelo paciente', _includeNotes, (v) => setState(() => _includeNotes = v ?? true)),
             const SizedBox(height: 16),

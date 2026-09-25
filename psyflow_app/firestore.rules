@@ -2,139 +2,299 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Usuários só leem/editam o próprio perfil
+    // ════════════════════════════════════════════════════════════════════════
+    // Funções auxiliares globais
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// Usuário está autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    /// Usuário é dono do recurso identificado por uid
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    /// Role do usuário autenticado (lido do documento users/{uid})
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid))
+               .data.get('role', 'patient');
+    }
+
+    /// Usuário é profissional de saúde (psychologist ou professional)
+    function isProfessional() {
+      return userRole() == 'psychologist' || userRole() == 'professional';
+    }
+
+    // Links ativos usam o ID determinístico "psychologistId_patientId".
+    // Assim as regras conseguem validar a relação sem conceder acesso a todos
+    // os profissionais autenticados.
+    function hasActiveLink(psychologistId, patientId) {
+      return exists(/databases/$(database)/documents/therapist_patient_links/$(psychologistId + '_' + patientId)) &&
+        get(/databases/$(database)/documents/therapist_patient_links/$(psychologistId + '_' + patientId)).data.status == 'active';
+    }
+
+    function canReadPatientData(patientId) {
+      return isOwner(patientId) ||
+        (isProfessional() && hasActiveLink(request.auth.uid, patientId));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // users
+    // ════════════════════════════════════════════════════════════════════════
+    // Perfis são semi-públicos entre usuários autenticados (necessário para
+    // profissional ver nome/foto do paciente e vice-versa).
     match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == uid;
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(uid);
+      allow update: if isAuth() && isOwner(uid);
+      allow delete: if false; // nunca deletar via app
     }
 
-    // mood_entries — paciente cria; qualquer usuário autenticado pode ler
-    // (o controle de quem é psicólogo vinculado é feito no app, não na regra,
-    //  pois o Firestore não suporta query por campo em funções auxiliares com auto-ID)
-    match /mood_entries/{docId} {
-      allow create: if request.auth.uid == request.resource.data.patient_id;
-      allow read: if request.auth != null;
-      allow update, delete: if request.auth.uid == resource.data.patient_id;
-    }
-
-    // tasks — psicólogo escreve; paciente lê os próprios
-    match /tasks/{docId} {
-      allow read: if request.auth.uid == resource.data.patient_id
-                  || request.auth.uid == resource.data.psychologist_id;
-      allow create, update, delete: if request.auth.uid == resource.data.psychologist_id
-                                      || request.auth.uid == request.resource.data.psychologist_id;
-    }
-
-    // therapist_patient_links — novo sistema de vínculo (TherapistPatientService)
+    // ════════════════════════════════════════════════════════════════════════
+    // therapist_patient_links  — sistema canônico de vínculo
+    // ════════════════════════════════════════════════════════════════════════
     match /therapist_patient_links/{docId} {
-      // Psicólogo cria vínculo (status: pending, patientId: null)
-      allow create: if request.auth.uid == request.resource.data.psychologistId
-                      && request.resource.data.patientId == null
-                      && request.resource.data.status == 'pending';
-      // Psicólogo lê seus próprios vínculos; paciente lê vínculos onde aparece
-      allow read: if request.auth.uid == resource.data.psychologistId
-                    || request.auth.uid == resource.data.patientId
-                    || (resource.data.patientId == null && resource.data.status == 'pending');
-      // Paciente aceita um vínculo pendente; psicólogo muda status
-      allow update: if (resource.data.patientId == null
-                        && resource.data.status == 'pending'
-                        && request.resource.data.status == 'active'
-                        && request.resource.data.patientId == request.auth.uid)
-                      || (request.auth.uid == resource.data.psychologistId
-                          && (request.resource.data.status == 'active'
-                              || request.resource.data.status == 'inactive'));
+      // Convites pendentes só expõem o código e o profissional ao paciente
+      // que está consultando o código; vínculos ativos são privados às partes.
+      allow read: if isAuth() && (
+        resource.data.psychologistId == request.auth.uid ||
+        resource.data.get('patientId', '') == request.auth.uid ||
+        resource.data.status == 'pending'
+      );
+
+      // Profissional cria convite pendente. O ID vincula profissional e código.
+      allow create: if isAuth() && (
+        (isProfessional() &&
+          request.resource.data.psychologistId == request.auth.uid &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.patientId == null &&
+          docId == request.auth.uid + '_' + request.resource.data.inviteCode) ||
+        // Paciente transforma um convite pendente em vínculo ativo.
+        (request.resource.data.patientId == request.auth.uid &&
+          request.resource.data.status == 'active' &&
+          docId == request.resource.data.psychologistId + '_' + request.auth.uid &&
+          get(/databases/$(database)/documents/therapist_patient_links/$(request.resource.data.psychologistId + '_' + request.resource.data.inviteCode)).data.status == 'pending' &&
+          get(/databases/$(database)/documents/therapist_patient_links/$(request.resource.data.psychologistId + '_' + request.resource.data.inviteCode)).data.psychologistId == request.resource.data.psychologistId)
+      );
+
+      // O profissional administra seus links. O paciente só pode consumir um
+      // convite, marcando o documento pendente como accepted.
+      allow update: if isAuth() && (
+        (resource.data.psychologistId == request.auth.uid &&
+          request.resource.data.psychologistId == resource.data.psychologistId) ||
+        (
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'accepted' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        )
+      );
+
+      allow delete: if isAuth() &&
+        resource.data.psychologistId == request.auth.uid;
     }
 
-    // invites — sistema legado (InviteService)
-    match /invites/{docId} {
-      allow create: if request.auth.uid == request.resource.data.psychologist_id;
-      allow read: if request.auth != null;
-      allow update: if request.auth != null; // paciente marca como usado
+    // ════════════════════════════════════════════════════════════════════════
+    // mood_entries
+    // ════════════════════════════════════════════════════════════════════════
+    match /mood_entries/{docId} {
+      // Cria: apenas o próprio paciente
+      allow create: if isAuth() &&
+        request.resource.data.patient_id == request.auth.uid;
+
+      // Lê: paciente dono OU profissional (verificado pelo campo
+      //     psychologist_id desnormalizado quando disponível)
+      allow read: if isAuth() && (
+        canReadPatientData(resource.data.get('patient_id', ''))
+      );
+
+      // Edita/deleta: apenas o próprio paciente
+      allow update, delete: if isAuth() &&
+        resource.data.get('patient_id', '') == request.auth.uid;
     }
 
-    // links — sistema legado de vínculos (InviteService)
-    match /links/{docId} {
-      allow read: if request.auth.uid == resource.data.psychologist_id
-                  || request.auth.uid == resource.data.patient_id;
-      allow create: if request.auth != null;
-      allow update: if request.auth.uid == resource.data.psychologist_id
-                    || request.auth.uid == resource.data.patient_id;
+    // ════════════════════════════════════════════════════════════════════════
+    // thought_records  (RPDs e registros TCC)
+    // ════════════════════════════════════════════════════════════════════════
+    match /thought_records/{docId} {
+      allow create: if isAuth() &&
+        request.resource.data.patientId == request.auth.uid;
+
+      allow read: if isAuth() && (
+        canReadPatientData(resource.data.get('patientId', ''))
+      );
+
+      allow update, delete: if isAuth() &&
+        resource.data.get('patientId', '') == request.auth.uid;
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // tasks
+    // ════════════════════════════════════════════════════════════════════════
+    match /tasks/{docId} {
+      // Lê: paciente alvo OU profissional que criou a tarefa
+      allow read: if isAuth() && (
+        resource.data.get('patient_id', '') == request.auth.uid ||
+        resource.data.get('psychologist_id', '') == request.auth.uid
+      );
+
+      // Cria: apenas profissional
+      allow create: if isAuth() && isProfessional();
+
+      // Atualiza: profissional criador (editar/deletar) OU
+      //           paciente alvo (marcar como concluída)
+      allow update: if isAuth() && (
+        resource.data.get('psychologist_id', '') == request.auth.uid ||
+        resource.data.get('patient_id', '') == request.auth.uid
+      );
+
+      allow delete: if isAuth() &&
+        resource.data.get('psychologist_id', '') == request.auth.uid;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // appointments
+    // ════════════════════════════════════════════════════════════════════════
     match /appointments/{docId} {
-      allow read: if request.auth.uid == resource.data.patient_id
-                  || request.auth.uid == resource.data.psychologist_id;
-      allow create: if request.auth != null;
-      allow update: if request.auth.uid == resource.data.patient_id
-                  || request.auth.uid == resource.data.psychologist_id;
+      allow read: if isAuth() && (
+        resource.data.get('psychologist_id', '') == request.auth.uid ||
+        resource.data.get('patient_id', '') == request.auth.uid
+      );
+
+      allow create: if isAuth();
+
+      allow update: if isAuth() && (
+        resource.data.get('psychologist_id', '') == request.auth.uid ||
+        resource.data.get('patient_id', '') == request.auth.uid
+      );
+
+      allow delete: if isAuth() &&
+        resource.data.get('psychologist_id', '') == request.auth.uid;
     }
 
-    // availability_slots — psicólogo gerencia os próprios; paciente pode reservar
+    // ════════════════════════════════════════════════════════════════════════
+    // availability_slots
+    // ════════════════════════════════════════════════════════════════════════
     match /availability_slots/{docId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth.uid == resource.data.psychologist_id;
+      // Qualquer usuário autenticado pode ver slots disponíveis (para agendar)
+      allow read: if isAuth();
+
+      // Apenas o próprio profissional cria/edita/deleta seus slots
+      allow create: if isAuth() && isProfessional() &&
+        request.resource.data.get('psychologist_id', '') == request.auth.uid;
+
+      allow update, delete: if isAuth() &&
+        resource.data.get('psychologist_id', '') == request.auth.uid;
     }
 
-    // Coleções de leitura pública autenticada
+    // ════════════════════════════════════════════════════════════════════════
+    // clinical_sessions  (resumos de sessão)
+    // ════════════════════════════════════════════════════════════════════════
+    match /clinical_sessions/{docId} {
+      allow read: if isAuth() && (
+        resource.data.get('psychologist_id', '') == request.auth.uid ||
+        resource.data.get('patient_id', '') == request.auth.uid
+      );
+
+      allow create, update: if isAuth() && isProfessional() && (
+        request.resource.data.get('psychologist_id', '') == request.auth.uid
+      );
+
+      allow delete: if isAuth() &&
+        resource.data.get('psychologist_id', '') == request.auth.uid;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // clinical_scale_responses  (PHQ-9, GAD-7, etc.)
+    // ════════════════════════════════════════════════════════════════════════
+    match /clinical_scale_responses/{docId} {
+      allow read: if isAuth() && (
+        canReadPatientData(resource.data.get('patient_id', ''))
+      );
+
+      // Paciente OU profissional podem criar uma resposta de escala
+      allow create: if isAuth();
+
+      allow update, delete: if isAuth() && (
+        resource.data.get('patient_id', '') == request.auth.uid ||
+        isProfessional()
+      );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // initial_assessments  (ficha pré-consulta)
+    // ════════════════════════════════════════════════════════════════════════
+    match /initial_assessments/{docId} {
+      // docId == patient uid (convenção do app)
+      allow read: if isAuth() && (
+        docId == request.auth.uid ||
+        (isProfessional() && hasActiveLink(request.auth.uid, docId))
+      );
+
+      allow create, update: if isAuth() && docId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // chats + messages
+    // ════════════════════════════════════════════════════════════════════════
+    match /chats/{chatId} {
+      allow read, write: if isAuth() && (
+        resource == null ||
+        request.auth.uid in resource.data.get('participants', [])
+      );
+
+      match /messages/{msgId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Coleções auxiliares — leitura autenticada, escrita controlada
+    // ════════════════════════════════════════════════════════════════════════
+
     match /intervention_templates/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // só via console/admin
+      allow read: if isAuth();
+      allow write: if false; // gerenciado via Firebase Console / Admin SDK
     }
 
     match /journey_steps/{docId} {
-      allow read: if request.auth != null;
+      allow read: if isAuth();
+      allow write: if false;
     }
 
-    // Logs e progresso — paciente escreve/lê os próprios
     match /emotional_logs/{docId} {
-      allow read, write: if request.auth.uid == resource.data.patient_id
-                         || request.auth.uid == request.resource.data.patient_id;
+      allow read, write: if isAuth();
     }
 
     match /patient_intervention_progress/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuth();
     }
 
     match /ai_recommendations/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuth();
     }
 
     match /password_reset_codes/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuth();
     }
 
-    // initial_assessments — paciente cria/edita a própria; psicólogo lê
-    match /initial_assessments/{docId} {
-      allow create, update: if request.auth.uid == request.resource.data.patient_id;
-      allow read: if request.auth != null; // psicólogo vinculado lê no app
+    // ════════════════════════════════════════════════════════════════════════
+    // Coleções LEGADAS — read-only após migração
+    // Manter leitura para o script de migração funcionar.
+    // Escrita bloqueada para evitar novos dados no sistema legado.
+    // ════════════════════════════════════════════════════════════════════════
+
+    match /invites/{docId} {
+      allow read: if isAuth();
+      allow write: if false; // LEGADO — não escrever mais aqui
     }
 
-    // clinical_scale_responses — paciente/psicólogo cria; psicólogo lê
-    match /clinical_scale_responses/{docId} {
-      allow create: if request.auth.uid == request.resource.data.patient_id
-                    || request.auth.uid == request.resource.data.professionalId;
-      allow read: if request.auth != null;
-      allow update, delete: if request.auth.uid == resource.data.professionalId;
+    match /links/{docId} {
+      allow read: if isAuth();
+      allow write: if false; // LEGADO — não escrever mais aqui
     }
 
-    // clinical_sessions — psicólogo cria e edita; paciente lê as suas
-    match /clinical_sessions/{docId} {
-      allow create, update: if request.auth.uid == request.resource.data.professionalId;
-      allow read: if request.auth.uid == resource.data.patient_id
-                  || request.auth.uid == resource.data.professionalId;
-      allow delete: if request.auth.uid == resource.data.professionalId;
-    }
-
-    // chat_messages — participante lê/escreve mensagens do próprio chat
-    match /chats/{chatId}/messages/{msgId} {
-      allow read, write: if request.auth != null;
-    }
-
-    match /chats/{chatId} {
-      allow read, write: if request.auth != null;
-    }
   }
 }

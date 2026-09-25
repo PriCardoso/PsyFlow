@@ -11,6 +11,8 @@ class TaskService {
   final FirebaseAuth _auth;
   final TaskRepository _taskRepository;
 
+  TaskRepository get taskRepository => _taskRepository;
+
   TaskService({
     required FirebaseFirestore firestore,
     required FirebaseAuth auth,
@@ -43,7 +45,7 @@ class TaskService {
             .toList());
   }
 
-  /// Psicólogo cria uma tarefa para um paciente
+  /// Psicólogo cria uma tarefa para um paciente com suporte a formulário dinâmico
   Future<void> createTask({
     required String patientId,
     required String title,
@@ -52,6 +54,9 @@ class TaskService {
     String? protocol,
     int difficultyLevel = 1,
     DateTime? dueDate,
+    String faixaEtaria = 'Adulto',
+    Map<String, dynamic>? configuracoes,
+    Map<String, dynamic>? estruturaResposta,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw AppException('Usuário não autenticado.');
@@ -74,8 +79,17 @@ class TaskService {
           'therapist_notes': null,
           'mood_before': null,
           'mood_after': null,
+          'faixa_etaria': faixaEtaria,
+          'configuracoes': configuracoes ?? {
+            'permite_notificacao': true,
+            'frequencia_lembrete': 'diario',
+            'horario_lembrete': '20:00',
+            'compartilhamento': 'automatico',
+          },
+          'estrutura_resposta': estruturaResposta,
+          'resposta_paciente': null,
         });
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao criar tarefa: $e', originalError: e);
     }
@@ -102,7 +116,7 @@ class TaskService {
           final doc = await _db.collection('users').doc(pid).get();
           if (doc.exists) {
             final data = doc.data()!;
-            patientNames[pid] = (data['full_name'] ?? data['fullName'] ?? '') as String;
+            patientNames[pid] = (data['full_name'] ?? data['fullName'] ?? data['name'] ?? '') as String;
           }
         }
 
@@ -110,7 +124,7 @@ class TaskService {
           final pid = t['patient_id'] as String;
           return TaskItem.fromMap({...t, 'patient_name': patientNames[pid]});
         }).toList();
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
@@ -133,7 +147,7 @@ class TaskService {
         return snap.docs
             .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
             .toList();
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
@@ -155,13 +169,63 @@ class TaskService {
         return snap.docs
             .map((d) => TaskItem.fromMap({'id': d.id, ...d.data()}))
             .toList();
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao buscar tarefas: $e', originalError: e);
     }
   }
 
-  /// Paciente conclui uma tarefa com resposta e humor
+  /// Paciente salva rascunho de uma tarefa para retomar depois
+  Future<void> saveDraftTask({
+    required String taskId,
+    required Map<String, dynamic> formValues,
+    int? moodBefore,
+  }) async {
+    try {
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).update({
+          'mood_before': moodBefore,
+          'resposta_paciente': {
+            'enviada_em': null,
+            'valores': formValues,
+            'is_draft': true,
+          },
+        });
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
+    } catch (e) {
+      throw AppException('Erro ao salvar rascunho: $e', originalError: e);
+    }
+  }
+
+  /// Paciente conclui tarefa enviando o formulário preenchido
+  Future<void> completeTaskWithForm({
+    required String taskId,
+    required Map<String, dynamic> formValues,
+    String? textSummary,
+    int? moodBefore,
+    int? moodAfter,
+  }) async {
+    try {
+      await retry(() async {
+        await _db.collection('tasks').doc(taskId).update({
+          'status': 'completed',
+          'completed_at': FieldValue.serverTimestamp(),
+          'patient_response': textSummary,
+          'mood_before': moodBefore,
+          'mood_after': moodAfter,
+          'resposta_paciente': {
+            'enviada_em': FieldValue.serverTimestamp(),
+            'valores': formValues,
+            'is_draft': false,
+          },
+        });
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
+    } catch (e) {
+      throw AppException('Erro ao concluir tarefa: $e', originalError: e);
+    }
+  }
+
+  /// Paciente conclui uma tarefa clássica com resposta e humor
   Future<void> completeTask({
     required String taskId,
     required String response,
@@ -176,8 +240,13 @@ class TaskService {
           'patient_response': response,
           'mood_before': moodBefore,
           'mood_after': moodAfter,
+          'resposta_paciente': {
+            'enviada_em': FieldValue.serverTimestamp(),
+            'valores': {'resposta': response},
+            'is_draft': false,
+          },
         });
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao concluir tarefa: $e', originalError: e);
     }
@@ -191,7 +260,7 @@ class TaskService {
           'status': completed ? 'completed' : 'pending',
           'completed_at': completed ? FieldValue.serverTimestamp() : null,
         });
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao atualizar tarefa: $e', originalError: e);
     }
@@ -202,7 +271,7 @@ class TaskService {
     try {
       await retry(() async {
         await _db.collection('tasks').doc(taskId).delete();
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao excluir tarefa: $e', originalError: e);
     }
@@ -218,7 +287,7 @@ class TaskService {
         await _db.collection('tasks').doc(taskId).update({
           'therapist_notes': notes,
         });
-      }, retries: 3, initialDelay: Duration(milliseconds: 300));
+      }, retries: 3, initialDelay: const Duration(milliseconds: 300));
     } catch (e) {
       throw AppException('Erro ao salvar anotação: $e', originalError: e);
     }

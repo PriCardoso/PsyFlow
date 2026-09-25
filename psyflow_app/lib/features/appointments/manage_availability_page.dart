@@ -83,6 +83,22 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
     );
   }
 
+  void _openSessionEvolutionSheet(AppointmentItem appointment) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SessionEvolutionSheet(
+        appointment: appointment,
+        appointmentService: _appointmentService,
+        onSaved: () {
+          _load();
+          _showSuccess('Resumo e evolução da consulta salvos com sucesso!');
+        },
+      ),
+    );
+  }
+
   Future<void> _removeSlot(AvailabilitySlot slot) async {
     try {
       await _appointmentService.deleteSlot(slot.id);
@@ -192,69 +208,147 @@ class _ManageAvailabilityPageState extends State<ManageAvailabilityPage> {
                   ),
 
                   // ── Próximas consultas ────────────────────────
-                  if (upcoming.isNotEmpty) ...[
-                    const _SectionLabel(text: 'Consultas agendadas'),
+                  if (_appointments.isNotEmpty) ...[
+                    const _SectionLabel(text: 'Consultas e Atendimentos'),
                     const SizedBox(height: 10),
-                    ...upcoming.map(
-                      (a) => Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppColors.success.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.event_available_rounded,
-                              color: AppColors.success,
-                              size: 24,
+                    ..._appointments.map(
+                      (a) {
+                        final hasNotes = a.notes != null && a.notes!.trim().isNotEmpty;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: hasNotes ? AppColors.psychologist.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+                              width: hasNotes ? 1.5 : 1,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => _openSessionEvolutionSheet(a),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    a.displayPatientName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: a.isUpcoming
+                                              ? AppColors.success.withValues(alpha: 0.12)
+                                              : AppColors.psychologist.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(
+                                          a.isUpcoming ? Icons.event_available_rounded : Icons.history_edu_rounded,
+                                          color: a.isUpcoming ? AppColors.success : AppColors.psychologist,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              a.displayPatientName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${_formatDateTime(a.startTime)} • ${a.modality.toUpperCase()}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: a.isUpcoming
+                                              ? AppColors.success.withValues(alpha: 0.15)
+                                              : AppColors.textSecondary.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          a.isUpcoming ? 'Confirmada' : 'Realizada',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: a.isUpcoming ? AppColors.success : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    _formatDateTime(a.startTime),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                  if (hasNotes) ...[
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.psychologist.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.psychologist),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'Resumo: ${a.notes!}',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.3),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 36,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.psychologist,
+                                        side: const BorderSide(color: AppColors.psychologist, width: 1.2),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      ),
+                                      onPressed: () => _openSessionEvolutionSheet(a),
+                                      icon: Icon(hasNotes ? Icons.edit_note_rounded : Icons.add_comment_rounded, size: 16),
+                                      label: Text(
+                                        hasNotes ? 'Editar Resumo / Evolução Clínica' : 'Escrever Resumo da Consulta',
+                                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'Confirmada',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.success,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                   ],
 
                   // ── Horários livres na agenda ─────────────────
@@ -1133,6 +1227,333 @@ class _ModalityCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 color: selected ? AppColors.psychologist : AppColors.textPrimary,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// SHEET DE EVOLUÇÃO / RESUMO DA CONSULTA CLÍNICA
+// =========================================================================
+class _SessionEvolutionSheet extends StatefulWidget {
+  final AppointmentItem appointment;
+  final AppointmentService appointmentService;
+  final VoidCallback onSaved;
+
+  const _SessionEvolutionSheet({
+    required this.appointment,
+    required this.appointmentService,
+    required this.onSaved,
+  });
+
+  @override
+  State<_SessionEvolutionSheet> createState() => _SessionEvolutionSheetState();
+}
+
+class _SessionEvolutionSheetState extends State<_SessionEvolutionSheet> {
+  final _summaryController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _moodObservedController = TextEditingController();
+  final _nextStepsController = TextEditingController();
+
+  bool _loading = true;
+  bool _saving = false;
+
+  final List<String> _moodSuggestions = [
+    'Calmo / Estável',
+    'Ansioso / Inquieto',
+    'Deprimido / Triste',
+    'Angustiado',
+    'Receptivo / Participativo',
+    'Resistente / Fechado',
+    'Eufórico / Acelerado',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingEvolution();
+  }
+
+  @override
+  void dispose() {
+    _summaryController.dispose();
+    _notesController.dispose();
+    _moodObservedController.dispose();
+    _nextStepsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadExistingEvolution() async {
+    final existing = await widget.appointmentService.getSessionEvolution(widget.appointment.id);
+    if (existing != null && mounted) {
+      setState(() {
+        _summaryController.text = existing.summary;
+        _notesController.text = existing.clinicalNotes;
+        _moodObservedController.text = existing.patientMoodObserved ?? '';
+        _nextStepsController.text = existing.nextSteps ?? '';
+      });
+    } else if (widget.appointment.notes != null && widget.appointment.notes!.trim().isNotEmpty) {
+      _summaryController.text = widget.appointment.notes!.trim();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _save() async {
+    final summary = _summaryController.text.trim();
+    if (summary.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, descreva o resumo da consulta / temas trabalhados.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await widget.appointmentService.saveSessionEvolution(
+        appointmentId: widget.appointment.id,
+        patientId: widget.appointment.patientId,
+        psychologistId: user.uid,
+        sessionDate: widget.appointment.startTime,
+        summary: summary,
+        clinicalNotes: _notesController.text.trim(),
+        patientMoodObserved: _moodObservedController.text.trim(),
+        nextSteps: _nextStepsController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onSaved();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar evolução: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appt = widget.appointment;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+        child: Column(
+          children: [
+            // Handle bar
+            const SizedBox(height: 12),
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.psychologist.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.history_edu_rounded, color: AppColors.psychologist, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Evolução & Resumo da Consulta',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Paciente: ${appt.displayPatientName}',
+                          style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 24),
+
+            // Form
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.psychologist))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. Resumo da Sessão (Relatório)
+                          const Text(
+                            '1. Resumo da Sessão / Temas Trabalhados *',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Este resumo fará parte do histórico do paciente e integrará os relatórios clínicos.',
+                            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _summaryController,
+                            maxLines: 4,
+                            decoration: InputDecoration(
+                              hintText: 'Descreva a queixa trazida, intervenções realizadas e avanços na sessão...',
+                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // 2. Estado Emocional Observado
+                          const Text(
+                            '2. Estado Emocional Observado no Paciente',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: _moodSuggestions.map((m) {
+                              final isSelected = _moodObservedController.text == m;
+                              return ChoiceChip(
+                                label: Text(m),
+                                selected: isSelected,
+                                selectedColor: AppColors.psychologist,
+                                labelStyle: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                ),
+                                onSelected: (val) {
+                                  setState(() {
+                                    _moodObservedController.text = val ? m : '';
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _moodObservedController,
+                            decoration: InputDecoration(
+                              hintText: 'Outro estado emocional ou observação afetiva...',
+                              hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // 3. Próximos Passos & Lição de Casa
+                          const Text(
+                            '3. Próximos Passos / Metas / Lição de Casa',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _nextStepsController,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              hintText: 'Ex: Preencher RPD ao longo da semana, praticar higiene do sono...',
+                              hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // 4. Anotações Privativas
+                          const Text(
+                            '4. Anotações Clínicas Privativas do Psicólogo',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Anotações de uso exclusivo do profissional (hipóteses diagnósticas, contratransferência, etc.).',
+                            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _notesController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: 'Notas particulares do terapeuta...',
+                              hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Botão Salvar
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.psychologist,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              onPressed: _saving ? null : _save,
+                              icon: _saving
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.check_circle_rounded, size: 20),
+                              label: Text(
+                                _saving ? 'Salvando...' : 'Salvar Resumo e Vincular ao Paciente',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),

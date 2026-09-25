@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/appointment_item.dart';
 import '../../models/psychologist_summary.dart';
 import '../../models/availability_slot.dart';
+import '../../models/clinical_session_model.dart';
 import '../../core/errors/app_exception.dart';
 
 class AppointmentService {
@@ -72,8 +73,8 @@ class AppointmentService {
       for (final doc in userDocs) {
         if (doc.exists) {
           final d = doc.data()!;
-          namesMap[doc.id] = d['full_name'] ?? d['fullName'] ?? 'Dr(a). Psicólogo(a)';
-          if (d['crp'] != null) crpMap[doc.id] = d['crp'];
+          namesMap[doc.id] = (d['full_name'] as String?) ?? (d['fullName'] as String?) ?? 'Dr(a). Psicólogo(a)';
+          if (d['crp'] != null) crpMap[doc.id] = d['crp'].toString();
         }
       }
 
@@ -122,7 +123,7 @@ class AppointmentService {
       for (final doc in userDocs) {
         if (doc.exists) {
           final d = doc.data()!;
-          namesMap[doc.id] = d['full_name'] ?? d['fullName'] ?? d['name'] ?? 'Paciente';
+          namesMap[doc.id] = (d['full_name'] as String?) ?? (d['fullName'] as String?) ?? (d['name'] as String?) ?? 'Paciente';
         }
       }
 
@@ -297,6 +298,82 @@ class AppointmentService {
       });
     } catch (e) {
       throw AppException('Erro ao cancelar consulta: $e', originalError: e);
+    }
+  }
+
+  /// Salva ou atualiza a evolução / resumo clínico da sessão
+  Future<void> saveSessionEvolution({
+    required String appointmentId,
+    required String patientId,
+    required String psychologistId,
+    required DateTime sessionDate,
+    required String summary,
+    String? clinicalNotes,
+    String? patientMoodObserved,
+    String? nextSteps,
+    List<String>? goalsAddressed,
+    List<String>? interventionsUsed,
+  }) async {
+    try {
+      final sessionRef = _db.collection('clinical_sessions').doc(appointmentId);
+      await sessionRef.set({
+        'professional_id': psychologistId,
+        'patient_id': patientId,
+        'session_date': Timestamp.fromDate(sessionDate),
+        'summary': summary.trim(),
+        'clinical_notes': clinicalNotes?.trim() ?? '',
+        'patient_mood_observed': patientMoodObserved?.trim() ?? '',
+        'next_steps': nextSteps?.trim() ?? '',
+        'goals_addressed': goalsAddressed ?? [],
+        'interventions_used': interventionsUsed ?? [],
+        'created_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _db.collection('appointments').doc(appointmentId).update({
+        'notes': summary.trim(),
+        'has_session_notes': true,
+      });
+    } catch (e) {
+      throw AppException('Erro ao salvar evolução da consulta: $e', originalError: e);
+    }
+  }
+
+  /// Busca a evolução clínica de um agendamento específico
+  Future<ClinicalSessionModel?> getSessionEvolution(String appointmentId) async {
+    try {
+      final doc = await _db.collection('clinical_sessions').doc(appointmentId).get();
+      if (doc.exists && doc.data() != null) {
+        return ClinicalSessionModel.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Busca todas as evoluções clínicas de um paciente ordenadas por data
+  Future<List<ClinicalSessionModel>> getClinicalSessionsForPatient(String patientId) async {
+    try {
+      final snap = await _db
+          .collection('clinical_sessions')
+          .where('patient_id', isEqualTo: patientId)
+          .orderBy('session_date', descending: true)
+          .get();
+
+      return snap.docs.map((d) => ClinicalSessionModel.fromMap(d.data(), d.id)).toList();
+    } catch (e) {
+      // Fallback sem ordenação caso o índice composto não esteja pronto
+      try {
+        final snap = await _db
+            .collection('clinical_sessions')
+            .where('patient_id', isEqualTo: patientId)
+            .get();
+        final list = snap.docs.map((d) => ClinicalSessionModel.fromMap(d.data(), d.id)).toList();
+        list.sort((a, b) => b.sessionDate.compareTo(a.sessionDate));
+        return list;
+      } catch (_) {
+        return [];
+      }
     }
   }
 }

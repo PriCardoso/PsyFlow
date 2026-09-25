@@ -26,7 +26,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => sl<TaskProvider>()),
         ChangeNotifierProvider(create: (_) => sl<AppointmentProvider>()),
         ChangeNotifierProvider(create: (_) => sl<MoodProvider>()),
-        ChangeNotifierProvider(create: (_) => sl<InviteProvider>()),
+        ChangeNotifierProvider(create: (_) => sl<LinkProvider>()),
         ChangeNotifierProvider(create: (_) => sl<PatientProvider>()),
         ChangeNotifierProvider(create: (_) => sl<ChatProvider>()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/invite_service.dart';
+import '../../core/services/therapist_patient_service.dart';
+import '../../core/services/initial_assessment_service.dart';
 import '../../core/di/service_locator.dart';
 import '../mood/mood_page.dart';
 import 'initial_assessment_page.dart';
@@ -14,7 +15,8 @@ class EnterInvitePage extends StatefulWidget {
 
 class _EnterInvitePageState extends State<EnterInvitePage> {
   final codeController = TextEditingController();
-  final _inviteService = sl<InviteService>();
+  final _linkService = sl<TherapistPatientService>();
+  final _assessmentService = sl<InitialAssessmentService>();
   bool loading = false;
   Map<String, dynamic>? linkedPsychologist;
   Map<String, dynamic>? initialAssessment;
@@ -29,10 +31,10 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
   Future<void> _checkExistingLink() async {
     setState(() => checkingData = true);
     try {
-      final link = await _inviteService.getMyPsychologist();
+      final link = await _linkService.getMyTherapistLink();
       Map<String, dynamic>? assessment;
       if (link != null) {
-        assessment = await _inviteService.getMyInitialAssessment();
+        assessment = await _assessmentService.getMyInitialAssessment();
       }
       if (mounted) {
         setState(() {
@@ -55,7 +57,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
     setState(() => loading = true);
 
     try {
-      await _inviteService.useInvite(codeController.text);
+      await _linkService.acceptInviteCode(codeController.text);
       if (mounted) {
         codeController.clear();
         await _checkExistingLink();
@@ -158,7 +160,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            psych['full_name'] ?? 'Psicólogo(a)',
+                                            psych['full_name'] as String? ?? 'Psicólogo(a)',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 16,
@@ -200,7 +202,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                                     if (psych['email'] != null) ...[
                                       const SizedBox(height: 2),
                                       Text(
-                                        psych['email'],
+                                        psych['email'] as String? ?? '',
                                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                       ),
                                     ],
@@ -212,7 +214,7 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                           if (psych['bio'] != null && psych['bio'].toString().isNotEmpty) ...[
                             const SizedBox(height: 14),
                             Text(
-                              psych['bio'],
+                            psych['bio'] as String? ?? '',
                               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
                             ),
                           ],
@@ -297,8 +299,8 @@ class _EnterInvitePageState extends State<EnterInvitePage> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => InitialAssessmentPage(
-                                        psychologistId: linkedPsychologist!['psychologist_id'],
-                                        psychologistName: psych['full_name'] ?? 'seu psicólogo',
+                                        psychologistId: linkedPsychologist!['psychologist_id'] as String? ?? linkedPsychologist!['psychologistId'] as String? ?? '',
+                                        psychologistName: psych['full_name'] as String? ?? 'seu psicólogo',
                                         onSubmitted: _checkExistingLink,
                                       ),
                                     ),

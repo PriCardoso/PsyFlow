@@ -30,7 +30,7 @@ class _LinkPatientPageState extends State<LinkPatientPage> {
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
-      final links = await _service.getMyPatientsLinks();
+      final links = await _service.getMyPatients();
       if (mounted) {
         setState(() {
           _links = links;

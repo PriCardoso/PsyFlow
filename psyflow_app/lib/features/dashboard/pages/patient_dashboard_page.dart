@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/appointment_service.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../models/appointment_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
-import '../../patients/presentation/pages/accept_link_page.dart';
+import '../../patient/enter_invite_page.dart';
 import '../../patient/espaco_psyflow_page.dart';
 import '../../tasks/patient_tasks_page.dart';
 import '../../mood/mood_page.dart';
-import '../../appointments/book_appointment_page.dart';
+import '../../../models/task_item.dart';
+import '../../../core/services/task_service.dart';
 
 class PatientDashboardPage extends StatefulWidget {
   final String? initialName;
@@ -27,10 +25,9 @@ class PatientDashboardPage extends StatefulWidget {
 }
 
 class _PatientDashboardPageState extends State<PatientDashboardPage> {
-  final _appointmentService = AppointmentService(FirebaseFirestore.instance);
   String? userName;
   String? userEmail;
-  List<AppointmentItem> _appointments = [];
+  List<TaskItem> _tasks = [];
   bool _loading = true;
 
   @override
@@ -58,18 +55,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           setState(() => userName = profileName.trim());
         }
       }
-      final appts = await _appointmentService.getMyAppointmentsAsPatient(user.uid);
-      if (mounted) setState(() => _appointments = appts);
+      try {
+        final tasks = await sl<TaskService>().getMyTasks();
+        if (mounted) setState(() => _tasks = tasks);
+      } catch (_) {}
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
-  }
-
-  String _formatDate(DateTime d) {
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${(d.year % 100).toString().padLeft(2, '0')}';
-  }
-
-  String _formatTime(DateTime d) {
-    return '${d.hour.toString().padLeft(2, '0')}h${d.minute > 0 ? d.minute.toString().padLeft(2, '0') : ''}';
   }
 
   @override
@@ -88,9 +79,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         : (userEmail != null && userEmail!.contains('@')
             ? userEmail!.split('@').first
             : 'Paciente');
-
-    final upcoming = _appointments.where((a) => a.isUpcoming).toList();
-    final next = upcoming.isNotEmpty ? upcoming.first : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -112,14 +100,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EspacoPsyFlowPage())),
           ),
           DrawerMenuItem(
-            label: 'Minhas consultas',
-            icon: Icons.calendar_today_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage())),
-          ),
-          DrawerMenuItem(
             label: 'Meu Psicólogo',
             icon: Icons.psychology_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const AcceptLinkPage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const EnterInvitePage())),
           ),
           DrawerMenuItem(
             label: 'Minhas Tarefas',
@@ -183,7 +166,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // ── Saudação + botão agendar ────────────────
+                    // ── Saudação + botão Minhas Atividades ──────
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -208,107 +191,68 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                         ),
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage()),
+                          MaterialPageRoute<void>(builder: (_) => const PatientTasksPage()),
                         ).then((_) => _load()),
-                        icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                        label: const Text('Marcar consulta', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        icon: const Icon(Icons.task_alt_rounded, size: 18),
+                        label: const Text('Ver Minhas Atividades', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // ── Próxima consulta ─────────────────────────
-                    PanelCard(
-                      title: 'Próxima consulta',
-                      footerLabel: 'Ver todas as consultas',
-                      onFooterTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(builder: (_) => const BookAppointmentPage()),
-                      ).then((_) => _load()),
-                      child: _loading
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator(color: AppColors.patient, strokeWidth: 2)),
-                            )
-                          : next == null
+                    // ── Minhas atividades / tarefas ──────────────
+                    Builder(
+                      builder: (context) {
+                        final pendingTasks = _tasks.where((t) => !t.isCompleted).toList();
+                        final firstTask = pendingTasks.isNotEmpty ? pendingTasks.first : null;
+
+                        return PanelCard(
+                          title: 'Minhas Atividades',
+                          footerLabel: 'Ver todas as atividades',
+                          onFooterTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(builder: (_) => const PatientTasksPage()),
+                          ).then((_) => _load()),
+                          child: pendingTasks.isEmpty
                               ? const PanelEmptyState(
-                                  icon: Icons.event_busy_rounded,
-                                  title: 'Nenhuma consulta agendada',
-                                  subtitle: 'Marque uma consulta para começar',
+                                  icon: Icons.task_alt_rounded,
+                                  title: 'Acompanhe suas atividades',
+                                  subtitle: 'Tarefas atribuídas pelo seu psicólogo aparecem aqui',
                                 )
                               : Row(
                                   children: [
                                     Container(
-                                      width: 64,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      width: 44,
+                                      height: 44,
                                       decoration: BoxDecoration(
-                                        color: AppColors.success,
+                                        color: AppColors.patient.withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            _formatDate(next.startTime),
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _formatTime(next.startTime),
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withValues(alpha: 0.25),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'agendada',
-                                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      child: const Icon(Icons.assignment_rounded, color: AppColors.patient, size: 22),
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 28,
-                                                height: 28,
-                                                decoration: BoxDecoration(
-                                                  gradient: const LinearGradient(colors: [AppColors.psychologist, AppColors.gradientEnd]),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 16),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  'Consulta com',
-                                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
                                           Text(
-                                            next.displayPsychologistName,
-                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
+                                            firstTask!.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary),
                                           ),
-                                          const Text(
-                                            'Psicólogo(a)',
-                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${pendingTasks.length} atividade(s) pendente(s)',
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                           ),
                                         ],
                                       ),
                                     ),
+                                    const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
                                   ],
                                 ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -326,7 +270,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                                 footerLabel: 'Ver vínculo',
                                 onFooterTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute<void>(builder: (_) => const AcceptLinkPage()),
+                                  MaterialPageRoute<void>(builder: (_) => const EnterInvitePage()),
                                 ),
                                 child: const PanelEmptyState(
                                   icon: Icons.psychology_outlined,
@@ -352,22 +296,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                           ],
                         );
                       },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Minhas tarefas ───────────────────────────
-                    PanelCard(
-                      title: 'Minhas Tarefas',
-                      footerLabel: 'Ver todas as tarefas',
-                      onFooterTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(builder: (_) => const PatientTasksPage()),
-                      ),
-                      child: const PanelEmptyState(
-                        icon: Icons.task_alt_rounded,
-                        title: 'Acompanhe suas atividades',
-                        subtitle: 'Tarefas atribuídas pelo seu psicólogo aparecem aqui',
-                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -558,4 +486,3 @@ class _ThemeChip extends StatelessWidget {
     );
   }
 }
-

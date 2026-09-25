@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/invite_service.dart';
+import '../../core/services/initial_assessment_service.dart';
 import '../../core/di/service_locator.dart';
 
 class InitialAssessmentPage extends StatefulWidget {
@@ -20,7 +20,7 @@ class InitialAssessmentPage extends StatefulWidget {
 }
 
 class _InitialAssessmentPageState extends State<InitialAssessmentPage> {
-  final _inviteService = sl<InviteService>();
+  final _assessmentService = sl<InitialAssessmentService>();
 
   final _complaintController = TextEditingController();
   final _durationController = TextEditingController();
@@ -60,7 +60,7 @@ class _InitialAssessmentPageState extends State<InitialAssessmentPage> {
     setState(() => _loading = true);
 
     try {
-      await _inviteService.submitInitialAssessment(
+      await _assessmentService.submitInitialAssessment(
         psychologistId: widget.psychologistId,
         mainComplaint: _complaintController.text.trim(),
         symptomsDuration: _durationController.text.trim(),

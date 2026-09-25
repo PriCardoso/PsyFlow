@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/task_service.dart';
-import '../../core/services/invite_service.dart';
 import '../../core/services/therapist_patient_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../models/task_item.dart';
@@ -18,7 +17,6 @@ class PsychologistTasksPage extends StatefulWidget {
 
 class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
   final _taskService = sl<TaskService>();
-  final _inviteService = sl<InviteService>();
   final _therapistService = sl<TherapistPatientService>();
 
   List<TaskItem> _tasks = [];
@@ -36,34 +34,18 @@ class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
     try {
       final tasks = await _taskService.getTasksCreatedByMe();
 
-      // Busca pacientes dos dois sistemas de vínculo
-      List<PatientLink> allPatients = [];
-
-      // Sistema legado (InviteService → coleção 'links')
-      try {
-        final legacyLinks = await _inviteService.getMyPatients();
-        allPatients.addAll(legacyLinks);
-      } catch (_) {}
-
       // Sistema novo (TherapistPatientService → coleção 'therapist_patient_links')
+      List<PatientLink> allPatients = [];
       try {
-        final newLinks = await _therapistService.getMyPatientsLinks();
-        for (final link in newLinks) {
-          if (link.isActive && link.patientId != null) {
-            final alreadyAdded = allPatients.any((p) => p.patient.id == link.patientId);
-            if (!alreadyAdded) {
-              allPatients.add(PatientLink(
-                linkId: link.id,
-                active: true,
-                createdAt: link.createdAt,
-                patient: link.patientProfile ??
-                    PatientProfile(
-                      id: link.patientId!,
-                      fullName: 'Paciente',
-                      email: '',
-                    ),
-              ));
-            }
+        final links = await _therapistService.getMyPatients();
+        for (final link in links) {
+          if (link.isActive && link.patientId != null && link.patientProfile != null) {
+            allPatients.add(PatientLink(
+              linkId: link.id,
+              active: true,
+              createdAt: link.createdAt,
+              patient: link.patientProfile!,
+            ));
           }
         }
       } catch (_) {}
@@ -71,7 +53,7 @@ class _PsychologistTasksPageState extends State<PsychologistTasksPage> {
       if (mounted) {
         setState(() {
           _tasks = tasks;
-          _patients = allPatients.where((l) => l.active).toList();
+          _patients = allPatients;
         });
       }
     } catch (e) {

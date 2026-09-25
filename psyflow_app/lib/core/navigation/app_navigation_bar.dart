@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:psyflow_app/core/theme/app_colors.dart';
 import 'package:psyflow_app/features/patient/patient_tasks_page.dart';
 import 'package:psyflow_app/features/mood/mood_page.dart';
-import 'package:psyflow_app/features/appointments/book_appointment_page.dart';
 import 'package:psyflow_app/features/dashboard/pages/patient_dashboard_page.dart';
 import 'package:psyflow_app/features/patients/presentation/pages/link_patient_page.dart';
 import 'package:psyflow_app/features/tasks/psychologist_tasks_page.dart';
-import 'package:psyflow_app/features/psychologist/manage_availability_page.dart';
 import 'package:psyflow_app/features/dashboard/pages/psychologist_dashboard_page.dart';
 import 'package:psyflow_app/models/user_model.dart';
 
@@ -47,11 +45,6 @@ class _AppNavigationBarState extends State<AppNavigationBar> {
             label: 'Início',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.calendar_today_outlined),
-            selectedIcon: const Icon(Icons.calendar_today_rounded),
-            label: 'Consultas',
-          ),
-          NavigationDestination(
             icon: const Icon(Icons.task_alt_outlined),
             selectedIcon: const Icon(Icons.task_alt_rounded),
             label: 'Tarefas',
@@ -73,11 +66,6 @@ class _AppNavigationBarState extends State<AppNavigationBar> {
             icon: const Icon(Icons.home_outlined),
             selectedIcon: const Icon(Icons.home_rounded),
             label: 'Início',
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.calendar_today_outlined),
-            selectedIcon: const Icon(Icons.calendar_today_rounded),
-            label: 'Agenda',
           ),
           NavigationDestination(
             icon: const Icon(Icons.people_outline_rounded),
@@ -193,7 +181,6 @@ class PatientNavigationScaffold extends StatelessWidget {
       accentColor: AppColors.patient,
       pageBuilder: (index) => [
         PatientDashboardPage(initialName: userName),
-        BookAppointmentPage(),
         PatientTasksPage(),
         MoodPage(),
         _PatientProfilePage(),
@@ -228,7 +215,6 @@ class ProfessionalNavigationScaffold extends StatelessWidget {
       accentColor: accentColor,
       pageBuilder: (index) => [
         PsychologistDashboardPage(initialName: userName),
-        ManageAvailabilityPage(),
         LinkPatientPage(),
         PsychologistTasksPage(),
         _ProfessionalProfilePage(),

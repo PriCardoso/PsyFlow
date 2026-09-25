@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/appointment_service.dart';
 import '../../../core/services/therapist_patient_service.dart';
+import '../../../core/services/task_service.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../models/appointment_item.dart';
+import '../../../models/task_item.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/panel_card.dart';
 import '../../auth/presentation/pages/edit_profile_page.dart';
 import '../../patients/presentation/pages/link_patient_page.dart';
 import '../../tasks/psychologist_tasks_page.dart';
-import '../../appointments/manage_availability_page.dart';
 
 class PsychologistDashboardPage extends StatefulWidget {
   final String? initialName;
@@ -25,13 +24,13 @@ class PsychologistDashboardPage extends StatefulWidget {
 }
 
 class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
-  final _appointmentService = sl<AppointmentService>();
   final _therapistPatientService = sl<TherapistPatientService>();
+  final _taskService = sl<TaskService>();
 
   String? userName;
   String? userEmail;
-  List<AppointmentItem> _appointments = [];
   int _activePatients = 0;
+  List<TaskItem> _tasks = [];
   bool _loading = true;
 
   @override
@@ -59,12 +58,16 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
           setState(() => userName = profileName.trim());
         }
       }
-      final appts = await _appointmentService.getMyAppointmentsAsPsychologist(user.uid);
-      final links = await _therapistPatientService.getMyPatientsLinks();
+      final patients = await _therapistPatientService.getMyPatients();
+      List<TaskItem> tasks = [];
+      try {
+        tasks = await _taskService.getTasksCreatedByMe();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
-          _appointments = appts;
-          _activePatients = links.length;
+          _activePatients = patients.length;
+          _tasks = tasks;
         });
       }
     } catch (_) {}
@@ -73,10 +76,6 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
 
   String _formatDate(DateTime d) {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${(d.year % 100).toString().padLeft(2, '0')}';
-  }
-
-  String _formatTime(DateTime d) {
-    return '${d.hour.toString().padLeft(2, '0')}h${d.minute > 0 ? d.minute.toString().padLeft(2, '0') : ''}';
   }
 
   @override
@@ -96,8 +95,8 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
             ? userEmail!.split('@').first
             : 'Psicólogo');
 
-    final upcoming = _appointments.where((a) => a.isUpcoming).toList();
-    final next = upcoming.isNotEmpty ? upcoming.first : null;
+    final pendingTasks = _tasks.where((t) => !t.isCompleted).toList();
+    final completedTasks = _tasks.where((t) => t.isCompleted).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -114,17 +113,12 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
             onTap: () {},
           ),
           DrawerMenuItem(
-            label: 'Minha Agenda',
-            icon: Icons.calendar_today_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage())),
-          ),
-          DrawerMenuItem(
             label: 'Meus Pacientes',
             icon: Icons.people_rounded,
             onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const LinkPatientPage())),
           ),
           DrawerMenuItem(
-            label: 'Tarefas',
+            label: 'Tarefas e Atividades',
             icon: Icons.task_alt_rounded,
             onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage())),
           ),
@@ -180,7 +174,7 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // ── Saudação + botão agenda ──────────────────
+                    // ── Saudação + botão gerenciar atividades ───
                     Text(
                       'Bem-vindo(a), Dr. $firstName',
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
@@ -198,111 +192,15 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                         ),
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
+                          MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage()),
                         ).then((_) => _load()),
-                        icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                        label: const Text('Gerenciar agenda', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        icon: const Icon(Icons.add_task_rounded, size: 18),
+                        label: const Text('Gerenciar Atividades dos Pacientes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // ── Próxima sessão ───────────────────────────
-                    PanelCard(
-                      title: 'Próxima sessão',
-                      footerLabel: 'Ver toda a agenda',
-                      onFooterTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
-                      ).then((_) => _load()),
-                      child: _loading
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator(color: AppColors.psychologist, strokeWidth: 2)),
-                            )
-                          : next == null
-                              ? const PanelEmptyState(
-                                  icon: Icons.event_busy_rounded,
-                                  title: 'Nenhuma sessão agendada',
-                                  subtitle: 'Configure sua agenda para começar',
-                                )
-                              : Row(
-                                  children: [
-                                    Container(
-                                      width: 64,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.success,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            _formatDate(next.startTime),
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _formatTime(next.startTime),
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withValues(alpha: 0.25),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'agendada',
-                                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 28,
-                                                height: 28,
-                                                decoration: BoxDecoration(
-                                                  gradient: const LinearGradient(colors: [AppColors.patient, AppColors.accentLight]),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(Icons.person_rounded, color: Colors.white, size: 16),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Expanded(
-                                                child: Text(
-                                                  'Consulta com',
-                                                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            next.displayPatientName,
-                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
-                                          ),
-                                          const Text(
-                                            'Paciente',
-                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Grid de 2 cards: Pacientes / Tarefas ──────
+                    // ── Grid de 2 cards: Pacientes / Atividades ───
                     LayoutBuilder(
                       builder: (context, constraints) {
                         return Wrap(
@@ -340,16 +238,29 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                             SizedBox(
                               width: (constraints.maxWidth - 16) / 2,
                               child: PanelCard(
-                                title: 'Tarefas',
+                                title: 'Atividades',
                                 footerLabel: 'Atribuir atividade',
                                 onFooterTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage()),
-                                ),
-                                child: const PanelEmptyState(
-                                  icon: Icons.task_alt_rounded,
-                                  title: 'Acompanhe atividades',
-                                ),
+                                ).then((_) => _load()),
+                                child: _loading
+                                    ? const SizedBox(height: 50, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
+                                    : Row(
+                                        children: [
+                                          Text(
+                                            '${_tasks.length}',
+                                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.psychologist),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${pendingTasks.length} pendente(s)\n${completedTasks.length} concluída(s)',
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.2),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ),
                           ],
@@ -358,39 +269,86 @@ class _PsychologistDashboardPageState extends State<PsychologistDashboardPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Próximas sessões da semana ────────────────
+                    // ── Painel de Atividades Recentes dos Pacientes ───
                     PanelCard(
-                      title: 'Próximas sessões',
-                      footerLabel: upcoming.length > 1 ? 'Ver todas (${upcoming.length})' : null,
-                      onFooterTap: upcoming.length > 1
+                      title: 'Atividades Recentes',
+                      footerLabel: _tasks.isNotEmpty ? 'Ver todas (${_tasks.length})' : null,
+                      onFooterTap: _tasks.isNotEmpty
                           ? () => Navigator.push(
                                 context,
-                                MaterialPageRoute<void>(builder: (_) => const ManageAvailabilityPage()),
+                                MaterialPageRoute<void>(builder: (_) => const PsychologistTasksPage()),
                               ).then((_) => _load())
                           : null,
                       child: _loading
-                          ? const SizedBox(height: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
-                          : upcoming.length <= 1
+                          ? const SizedBox(height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.psychologist)))
+                          : _tasks.isEmpty
                               ? const PanelEmptyState(
-                                  icon: Icons.calendar_month_outlined,
-                                  title: 'Sem outras sessões na fila',
+                                  icon: Icons.assignment_outlined,
+                                  title: 'Nenhuma atividade atribuída',
+                                  subtitle: 'Crie e envie tarefas terapêuticas para seus pacientes',
                                 )
                               : Column(
-                                  children: upcoming.skip(1).take(3).map((a) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 10),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.event_rounded, color: AppColors.psychologist, size: 18),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                '${a.displayPatientName} • ${_formatDate(a.startTime)} ${_formatTime(a.startTime)}',
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                  children: _tasks.take(4).map((task) {
+                                    final isDone = task.isCompleted;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: (isDone ? AppColors.success : AppColors.psychologist).withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              isDone ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                                              color: isDone ? AppColors.success : AppColors.psychologist,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  task.title,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  task.patientName != null && task.patientName!.isNotEmpty
+                                                      ? 'Paciente: ${task.patientName}'
+                                                      : (task.dueDate != null
+                                                          ? 'Entrega: ${_formatDate(task.dueDate!)}'
+                                                          : (isDone ? 'Concluída' : 'Pendente')),
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: (isDone ? AppColors.success : Colors.orange).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              isDone ? 'Concluída' : 'Pendente',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: isDone ? AppColors.success : Colors.orange.shade800,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      )).toList(),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                     ),
                   ]),

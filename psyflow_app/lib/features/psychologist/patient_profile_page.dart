@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/invite_service.dart';
+import '../../core/services/therapist_patient_service.dart';
+import '../../core/services/initial_assessment_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../models/patient_link_model.dart';
 import '../mood/patient_mood_history_page.dart';
@@ -22,7 +23,8 @@ class PatientProfilePage extends StatefulWidget {
 }
 
 class _PatientProfilePageState extends State<PatientProfilePage> {
-  final _service = sl<InviteService>();
+  final _linkService = sl<TherapistPatientService>();
+  final _assessmentService = sl<InitialAssessmentService>();
   bool _loading = false;
   late bool _isActive;
   Map<String, dynamic>? _initialAssessment;
@@ -37,7 +39,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   Future<void> _loadInitialAssessment() async {
     try {
-      final assessment = await _service.getPatientInitialAssessment(widget.link.patient.id);
+      final assessment = await _assessmentService.getPatientInitialAssessment(widget.link.patient.id);
       if (mounted) {
         setState(() {
           _initialAssessment = assessment;
@@ -56,9 +58,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     setState(() => _loading = true);
     try {
       if (_isActive) {
-        await _service.deactivateLink(widget.link.linkId);
+        await _linkService.deactivateLink(widget.link.linkId);
       } else {
-        await _service.reactivateLink(widget.link.linkId);
+        await _linkService.reactivateLink(widget.link.linkId);
       }
       setState(() => _isActive = !_isActive);
       widget.onStatusChanged?.call();

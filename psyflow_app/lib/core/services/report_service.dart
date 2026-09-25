@@ -3,11 +3,11 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:psyflow_app/models/user_model.dart';
 import 'package:psyflow_app/models/mood_model.dart';
 import 'package:psyflow_app/models/task_item.dart';
 import 'package:psyflow_app/models/clinical_session_model.dart';
 import 'package:psyflow_app/models/clinical_scale_model.dart';
+import 'package:psyflow_app/models/thought_record_model.dart';
 
 class ReportService {
   static final ReportService _instance = ReportService._internal();
@@ -23,6 +23,7 @@ class ReportService {
     required List<TaskItem> tasks,
     required List<ClinicalSessionModel> sessions,
     required List<ClinicalScaleResponseModel> scaleResponses,
+    List<ThoughtRecordEntry> thoughtRecords = const [],
     required DateTime periodStart,
     required DateTime periodEnd,
   }) async {
@@ -53,6 +54,10 @@ class ReportService {
           _buildSessionsSection(sessions, font, fontBold),
           pw.SizedBox(height: 16),
           _buildScalesSection(scaleResponses, font, fontBold),
+          if (thoughtRecords.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            _buildThoughtRecordsSection(thoughtRecords, font, fontBold),
+          ],
           pw.SizedBox(height: 24),
           _buildFooter(font, fontBold),
         ],
@@ -422,7 +427,7 @@ class ReportService {
             ...tasks.take(15).map((task) => pw.TableRow(
               children: [
                 _buildTableCell(task.title, font),
-                _buildTableCell(task.category ?? '-', font),
+                _buildTableCell(task.category.isNotEmpty ? task.category : '-', font),
                 _buildTableCell(
                   _getTaskStatusLabel(task.status),
                   font,
@@ -488,10 +493,22 @@ class ReportService {
               if (session.summary.isNotEmpty) ...[
                 pw.SizedBox(height: 6),
                 pw.Text(
-                  session.summary,
-                  style: pw.TextStyle(font: font, fontSize: 10, color: PdfColor.fromHex('#444444')),
-                  maxLines: 3,
-                  overflow: pw.TextOverflow.clip,
+                  'Resumo da Consulta: ${session.summary}',
+                  style: pw.TextStyle(font: font, fontSize: 10, color: PdfColor.fromHex('#333333')),
+                ),
+              ],
+              if (session.patientMoodObserved != null && session.patientMoodObserved!.isNotEmpty) ...[
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Estado emocional observado: ${session.patientMoodObserved}',
+                  style: pw.TextStyle(font: font, fontSize: 9.5, color: PdfColor.fromHex('#555555')),
+                ),
+              ],
+              if (session.nextSteps != null && session.nextSteps!.isNotEmpty) ...[
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Próximos passos / Metas: ${session.nextSteps}',
+                  style: pw.TextStyle(font: font, fontSize: 9.5, color: PdfColor.fromHex('#555555')),
                 ),
               ],
               if (session.interventionsUsed.isNotEmpty) ...[
@@ -561,6 +578,66 @@ class ReportService {
             )),
           ],
         ),
+      ],
+    );
+  }
+
+  pw.Widget _buildThoughtRecordsSection(
+    List<ThoughtRecordEntry> records,
+    pw.Font font,
+    pw.Font fontBold,
+  ) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Registros de Pensamentos & TCC (RPDs)', fontBold),
+        pw.SizedBox(height: 8),
+        ...records.take(6).map((rpd) {
+          final relief = rpd.averageRelief;
+          final distortionsStr = rpd.cognitiveDistortions.map((id) {
+            final info = CognitiveDistortionCatalog.findById(id);
+            return info?.shortName ?? id;
+          }).join(', ');
+
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 8),
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#F8FAFC'),
+              borderRadius: pw.BorderRadius.circular(6),
+              border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0'), width: 0.5),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Data: ${_formatDate(rpd.createdAt)}',
+                      style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#2C5E7A')),
+                    ),
+                    if (relief > 0)
+                      pw.Text(
+                        'Alívio emocional: -$relief%',
+                        style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#10B981')),
+                      ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text('Situação: ${rpd.situation}', style: pw.TextStyle(font: font, fontSize: 9)),
+                pw.SizedBox(height: 2),
+                pw.Text('Pensamento Automático: "${rpd.automaticThought}"', style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('#DC2626'))),
+                if (distortionsStr.isNotEmpty) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text('Distorções Cognitivas: $distortionsStr', style: pw.TextStyle(font: fontBold, fontSize: 8.5, color: PdfColor.fromHex('#4F46E5'))),
+                ],
+                pw.SizedBox(height: 2),
+                pw.Text('Resposta Racional: ${rpd.rationalResponse}', style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('#047857'))),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
